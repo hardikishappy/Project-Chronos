@@ -1,0 +1,11 @@
+{
+  "Strategy": "Project_Chronos_Ensemble",
+  "SharpeRatio": 1.635,
+  "SortinoRatio": 0.168,
+  "MaxDrawdown": 0.0592,
+  "AnnualizedReturn": 0.143,
+  "AverageTurnover": 0.2321,
+  "InitialEquity": 100000.0,
+  "FinalEquity": 149003.08,
+  "TradingDays": 752
+}

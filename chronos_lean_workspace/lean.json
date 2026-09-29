@@ -1,0 +1,28 @@
+{
+  "data-folder": "data",
+  "default-language": "python",
+  "job-organization-id": "chronos-local-org",
+  "algorithm-type-name": "BasicTemplateAlgorithm",
+  "algorithm-language": "Python",
+  "algorithm-location": "main.py",
+  "data-provider": "QuantConnect.Lean.Engine.DataFeeds.DefaultDataProvider",
+  "map-file-provider": "QuantConnect.Data.Auxiliary.LocalDiskMapFileProvider",
+  "factor-file-provider": "QuantConnect.Data.Auxiliary.LocalDiskFactorFileProvider",
+  "environments": {
+    "backtesting": {
+      "live-mode": false,
+      "setup-handler": "QuantConnect.Lean.Engine.Setup.ConsoleSetupHandler",
+      "result-handler": "QuantConnect.Lean.Engine.Results.BacktestingResultHandler",
+      "data-feed-handler": "QuantConnect.Lean.Engine.DataFeeds.FileSystemDataFeed",
+      "real-time-handler": "QuantConnect.Lean.Engine.RealTime.BacktestingRealTimeHandler",
+      "transaction-handler": "QuantConnect.Lean.Engine.TransactionHandlers.BacktestingTransactionHandler"
+    }
+  },
+  "parameters": {
+    "start-date": "2021-01-01",
+    "end-date": "2024-01-01",
+    "initial-cash": 100000.0,
+    "fee-model": "zero",
+    "slippage-model": "zero"
+  }
+}

@@ -1,0 +1,662 @@
+{
+  "rKOZWNJJ": {
+    "alpha_id": "rKOZWNJJ",
+    "status": "ACTIVE",
+    "expression": "0.5 * group_rank(ts_rank(operating_income / equity, 126), subindustry) + 0.5 * group_rank(ts_rank(est_eps / close, 126), industry)",
+    "expression_hash": "e7fb8a7636841058004b0246c0cd1dce9bc1c27233a5933a0cf01667ff518458",
+    "last_backtested": "2026-09-29T23:49:12.272421",
+    "metrics": {
+      "AlphaId": "rKOZWNJJ",
+      "SharpeRatio": 1.777,
+      "SortinoRatio": 0.169,
+      "MaxDrawdown": 0.0895,
+      "AnnualizedReturn": 0.1924,
+      "AverageTurnover": 0.2296,
+      "InitialEquity": 100000.0,
+      "FinalEquity": 169081.52,
+      "TradingDays": 752,
+      "CorrelationWithActivePortfolio": -0.846,
+      "EnsembleVerdict": "[ACCEPTED FOR LIVE ROUTING]"
+    }
+  },
+  "E5p9K3gr": {
+    "alpha_id": "E5p9K3gr",
+    "status": "ACTIVE",
+    "expression": "group_rank(ts_rank(est_eps / close, 126), industry)",
+    "expression_hash": "9c24d7a07bea5dc88069a782c87aee05483604270d1934b0421612446ad1c563",
+    "last_backtested": "2026-09-29T23:49:14.975294",
+    "metrics": {
+      "AlphaId": "E5p9K3gr",
+      "SharpeRatio": 1.25,
+      "SortinoRatio": 0.117,
+      "MaxDrawdown": 0.1522,
+      "AnnualizedReturn": 0.1568,
+      "AverageTurnover": 0.037,
+      "InitialEquity": 100000.0,
+      "FinalEquity": 154432.34,
+      "TradingDays": 752,
+      "CorrelationWithActivePortfolio": 0.135,
+      "EnsembleVerdict": "[ACCEPTED FOR LIVE ROUTING]"
+    }
+  },
+  "d5bNdNVX": {
+    "alpha_id": "d5bNdNVX",
+    "status": "ACTIVE",
+    "expression": "group_rank(ts_rank(operating_income / equity, 126), subindustry)",
+    "expression_hash": "2b79d18505d85eeee2ac66385c2ec5821b32ca262b0accfed566542fcdc8e07c",
+    "last_backtested": "2026-09-29T23:49:17.599909",
+    "metrics": {
+      "AlphaId": "d5bNdNVX",
+      "SharpeRatio": 1.379,
+      "SortinoRatio": 0.13,
+      "MaxDrawdown": 0.0629,
+      "AnnualizedReturn": 0.1402,
+      "AverageTurnover": 0.241,
+      "InitialEquity": 100000.0,
+      "FinalEquity": 147938.57,
+      "TradingDays": 752,
+      "CorrelationWithActivePortfolio": -0.98,
+      "EnsembleVerdict": "[ACCEPTED FOR LIVE ROUTING]"
+    }
+  },
+  "88j2G0ZV": {
+    "alpha_id": "88j2G0ZV",
+    "status": "ACTIVE",
+    "expression": "rank(ts_sum(vec_avg(nws12_afterhsz_sl), 60)) * rank(-ts_delta(close, 2))\r\n",
+    "expression_hash": "a0a7412eb4c9fb0d6926393cb032797f8d4f626f78a5c89768dac7659804c7fb",
+    "last_backtested": "2026-09-29T23:49:20.554854",
+    "metrics": {
+      "AlphaId": "88j2G0ZV",
+      "SharpeRatio": -1.265,
+      "SortinoRatio": -0.112,
+      "MaxDrawdown": 0.362,
+      "AnnualizedReturn": -0.1289,
+      "AverageTurnover": 0.4731,
+      "InitialEquity": 100000.0,
+      "FinalEquity": 66243.05,
+      "TradingDays": 752,
+      "CorrelationWithActivePortfolio": 0.423,
+      "EnsembleVerdict": "[REJECTED]"
+    }
+  },
+  "wpZvNlv1": {
+    "alpha_id": "wpZvNlv1",
+    "status": "ACTIVE",
+    "expression": "rank(-ts_delta(close, 1)) * rank(volume / ts_mean(volume, 100))",
+    "expression_hash": "1a2789655c5a1e088bcdaba5588a4c7e388e37e0dd561e9814d71f96832ad980",
+    "last_backtested": "2026-09-29T23:49:23.184100",
+    "metrics": {
+      "AlphaId": "wpZvNlv1",
+      "SharpeRatio": -1.042,
+      "SortinoRatio": -0.079,
+      "MaxDrawdown": 0.3462,
+      "AnnualizedReturn": -0.1056,
+      "AverageTurnover": 0.5514,
+      "InitialEquity": 100000.0,
+      "FinalEquity": 71674.89,
+      "TradingDays": 752,
+      "CorrelationWithActivePortfolio": 0.334,
+      "EnsembleVerdict": "[REJECTED]"
+    }
+  },
+  "vRro8eqa": {
+    "alpha_id": "vRro8eqa",
+    "status": "ACTIVE",
+    "expression": "group_rank(\r\n    ts_rank(\r\n        operating_income / equity\r\n        - close / vwap,\r\n        66\r\n    ),\r\n    subindustry\r\n)",
+    "expression_hash": "dc8e09c9dfb3345e968a173cb9a347fb5bf7caa9086ea7d9fdf2b0cefbd179ec",
+    "last_backtested": "2026-09-29T23:49:26.006883",
+    "metrics": {
+      "AlphaId": "vRro8eqa",
+      "SharpeRatio": -1.084,
+      "SortinoRatio": -0.097,
+      "MaxDrawdown": 0.3968,
+      "AnnualizedReturn": -0.1289,
+      "AverageTurnover": 0.3196,
+      "InitialEquity": 100000.0,
+      "FinalEquity": 66246.4,
+      "TradingDays": 752,
+      "CorrelationWithActivePortfolio": 0.548,
+      "EnsembleVerdict": "[REJECTED]"
+    }
+  },
+  "MPa2Mmlz": {
+    "alpha_id": "MPa2Mmlz",
+    "status": "ACTIVE",
+    "expression": "-1 * (group_rank(ts_decay_linear((close - vwap) / ts_mean(high - low, 5), 5), subindustry) - 0.5)\r\n+ (group_rank(ts_rank(operating_income / equity, 66), subindustry) - 0.5)",
+    "expression_hash": "d3a77176e724443543fab30aa1877d0bd2e59805215de81c576203c2878975de",
+    "last_backtested": "2026-09-29T23:49:29.085322",
+    "metrics": {
+      "AlphaId": "MPa2Mmlz",
+      "SharpeRatio": 1.379,
+      "SortinoRatio": 0.13,
+      "MaxDrawdown": 0.0629,
+      "AnnualizedReturn": 0.1402,
+      "AverageTurnover": 0.241,
+      "InitialEquity": 100000.0,
+      "FinalEquity": 147938.57,
+      "TradingDays": 752,
+      "CorrelationWithActivePortfolio": -0.98,
+      "EnsembleVerdict": "[ACCEPTED FOR LIVE ROUTING]"
+    }
+  },
+  "9qjkndAe": {
+    "alpha_id": "9qjkndAe",
+    "status": "ACTIVE",
+    "expression": "(group_rank(ts_rank(est_eps / close, 66), subindustry) - 0.5)\r\n+\r\n(group_rank(-ts_corr(est_ptp, est_fcf, 66), subindustry) - 0.5)",
+    "expression_hash": "ebb52832c8b5ad54d0308e1b6ef84816ba9520d8a512ba91226d02c80f8e5c0d",
+    "last_backtested": "2026-09-29T23:49:31.548081",
+    "metrics": {
+      "AlphaId": "9qjkndAe",
+      "SharpeRatio": 1.25,
+      "SortinoRatio": 0.117,
+      "MaxDrawdown": 0.1522,
+      "AnnualizedReturn": 0.1568,
+      "AverageTurnover": 0.037,
+      "InitialEquity": 100000.0,
+      "FinalEquity": 154432.34,
+      "TradingDays": 752,
+      "CorrelationWithActivePortfolio": 0.135,
+      "EnsembleVerdict": "[ACCEPTED FOR LIVE ROUTING]"
+    }
+  },
+  "3qXJ27LN": {
+    "alpha_id": "3qXJ27LN",
+    "status": "ACTIVE",
+    "expression": "-1 * (group_rank(ts_decay_linear((close - vwap) / vwap, 5), subindustry) - 0.5) * group_rank(volume / adv20, subindustry) + (group_rank(-ts_corr(est_ptp, est_fcf, 66), subindustry) - 0.5)",
+    "expression_hash": "c69879334525aab094e88feba03672a546896d95d07d52773f3869522129e20f",
+    "last_backtested": "2026-09-29T23:49:34.001516",
+    "metrics": {
+      "AlphaId": "3qXJ27LN",
+      "SharpeRatio": 1.25,
+      "SortinoRatio": 0.117,
+      "MaxDrawdown": 0.1522,
+      "AnnualizedReturn": 0.1568,
+      "AverageTurnover": 0.037,
+      "InitialEquity": 100000.0,
+      "FinalEquity": 154432.34,
+      "TradingDays": 752,
+      "CorrelationWithActivePortfolio": 0.135,
+      "EnsembleVerdict": "[ACCEPTED FOR LIVE ROUTING]"
+    }
+  },
+  "omLZoqXl": {
+    "alpha_id": "omLZoqXl",
+    "status": "ACTIVE",
+    "expression": "-1 * (group_rank(ts_decay_linear((close - open) / open, 4), subindustry) - 0.5) + (group_rank(-ts_corr(est_ptp, est_fcf, 66), subindustry) - 0.5)",
+    "expression_hash": "476c0703a2a7c5869727cf254c1fad5a7c7a8c7f29001600c94688ed3920a6ed",
+    "last_backtested": "2026-09-29T23:49:37.251539",
+    "metrics": {
+      "AlphaId": "omLZoqXl",
+      "SharpeRatio": 1.25,
+      "SortinoRatio": 0.117,
+      "MaxDrawdown": 0.1522,
+      "AnnualizedReturn": 0.1568,
+      "AverageTurnover": 0.037,
+      "InitialEquity": 100000.0,
+      "FinalEquity": 154432.34,
+      "TradingDays": 752,
+      "CorrelationWithActivePortfolio": 0.135,
+      "EnsembleVerdict": "[ACCEPTED FOR LIVE ROUTING]"
+    }
+  },
+  "A1NmeMQY": {
+    "alpha_id": "A1NmeMQY",
+    "status": "ACTIVE",
+    "expression": "-1 * (group_rank(ts_decay_linear((close - open) / open, 4), subindustry) - 0.5) + (group_rank(ts_rank(est_eps / close, 66), subindustry) - 0.5)",
+    "expression_hash": "9c1243c0dbd923254fdfa707c431319bc28f0e223d14ed0945e8d86eea80faa6",
+    "last_backtested": "2026-09-29T23:49:39.603181",
+    "metrics": {
+      "AlphaId": "A1NmeMQY",
+      "SharpeRatio": 1.25,
+      "SortinoRatio": 0.117,
+      "MaxDrawdown": 0.1522,
+      "AnnualizedReturn": 0.1568,
+      "AverageTurnover": 0.037,
+      "InitialEquity": 100000.0,
+      "FinalEquity": 154432.34,
+      "TradingDays": 752,
+      "CorrelationWithActivePortfolio": 0.135,
+      "EnsembleVerdict": "[ACCEPTED FOR LIVE ROUTING]"
+    }
+  },
+  "pwRZWEnV": {
+    "alpha_id": "pwRZWEnV",
+    "status": "ACTIVE",
+    "expression": "-1 * group_rank(ts_decay_linear((close - open) / open, 4), subindustry)",
+    "expression_hash": "c87a1cdaefde83f05f16de0c0b90c69a538a951d32bf8fe2bcf6f8982c61563e",
+    "last_backtested": "2026-09-29T23:49:42.239036",
+    "metrics": {
+      "AlphaId": "pwRZWEnV",
+      "SharpeRatio": -0.524,
+      "SortinoRatio": -0.051,
+      "MaxDrawdown": 0.2372,
+      "AnnualizedReturn": -0.0675,
+      "AverageTurnover": 0.3554,
+      "InitialEquity": 100000.0,
+      "FinalEquity": 81184.72,
+      "TradingDays": 752,
+      "CorrelationWithActivePortfolio": 0.574,
+      "EnsembleVerdict": "[REJECTED]"
+    }
+  },
+  "gJbG5Qrm": {
+    "alpha_id": "gJbG5Qrm",
+    "status": "ACTIVE",
+    "expression": "group_rank(ts_rank(est_eps/close, 66),industry)",
+    "expression_hash": "294534f283673f6caba89a240c29adbe69e7eb8227059465b16fa2be7021fe61",
+    "last_backtested": "2026-09-29T23:49:44.678056",
+    "metrics": {
+      "AlphaId": "gJbG5Qrm",
+      "SharpeRatio": 1.25,
+      "SortinoRatio": 0.117,
+      "MaxDrawdown": 0.1522,
+      "AnnualizedReturn": 0.1568,
+      "AverageTurnover": 0.037,
+      "InitialEquity": 100000.0,
+      "FinalEquity": 154432.34,
+      "TradingDays": 752,
+      "CorrelationWithActivePortfolio": 0.135,
+      "EnsembleVerdict": "[ACCEPTED FOR LIVE ROUTING]"
+    }
+  },
+  "3qX8jGe6": {
+    "alpha_id": "3qX8jGe6",
+    "status": "ACTIVE",
+    "expression": "0.5 * group_rank(ts_rank(est_ptp / close, 126), industry) - 0.5 * group_rank(ts_rank(close / open - 1, 20), subindustry)",
+    "expression_hash": "1bfd91917f0cb0836af211280cd2ef810236fb98f19cd077928ca687fd274b0e",
+    "last_backtested": "2026-09-29T23:49:47.499499",
+    "metrics": {
+      "AlphaId": "3qX8jGe6",
+      "SharpeRatio": 0.76,
+      "SortinoRatio": 0.075,
+      "MaxDrawdown": 0.1488,
+      "AnnualizedReturn": 0.0777,
+      "AverageTurnover": 0.4971,
+      "InitialEquity": 100000.0,
+      "FinalEquity": 125023.37,
+      "TradingDays": 752,
+      "CorrelationWithActivePortfolio": 0.24,
+      "EnsembleVerdict": "[REJECTED]"
+    }
+  },
+  "78NeYnPb": {
+    "alpha_id": "78NeYnPb",
+    "status": "ACTIVE",
+    "expression": "0.5 * group_rank(ts_rank(est_sales / close, 126), industry) + 0.5 * group_rank(ts_rank(operating_income / assets, 126), subindustry)",
+    "expression_hash": "73795c6242db2497c9b11d5447c0ea0fdbd6e1d618b81aae58f4b3537989b2d6",
+    "last_backtested": "2026-09-29T23:49:50.136002",
+    "metrics": {
+      "AlphaId": "78NeYnPb",
+      "SharpeRatio": 1.379,
+      "SortinoRatio": 0.13,
+      "MaxDrawdown": 0.0629,
+      "AnnualizedReturn": 0.1402,
+      "AverageTurnover": 0.241,
+      "InitialEquity": 100000.0,
+      "FinalEquity": 147938.57,
+      "TradingDays": 752,
+      "CorrelationWithActivePortfolio": -0.98,
+      "EnsembleVerdict": "[ACCEPTED FOR LIVE ROUTING]"
+    }
+  },
+  "YPbR8kaq": {
+    "alpha_id": "YPbR8kaq",
+    "status": "ACTIVE",
+    "expression": "0.5 * group_rank(ts_rank(est_fcf / close, 126), industry) - 0.5 * group_rank(ts_rank(close / open - 1, 20), subindustry)",
+    "expression_hash": "fed5e9bf6b7b62d11272403c9781ed9a3809f865d18144c194e85991ce24ee75",
+    "last_backtested": "2026-09-29T23:49:52.776744",
+    "metrics": {
+      "AlphaId": "YPbR8kaq",
+      "SharpeRatio": 0.76,
+      "SortinoRatio": 0.075,
+      "MaxDrawdown": 0.1488,
+      "AnnualizedReturn": 0.0777,
+      "AverageTurnover": 0.4971,
+      "InitialEquity": 100000.0,
+      "FinalEquity": 125023.37,
+      "TradingDays": 752,
+      "CorrelationWithActivePortfolio": 0.24,
+      "EnsembleVerdict": "[REJECTED]"
+    }
+  },
+  "rKe1mOzd": {
+    "alpha_id": "rKe1mOzd",
+    "status": "ACTIVE",
+    "expression": "0.5 * group_rank(ts_rank(ts_backfill(anl4_fs_detail_estimates_advanced_af_nd_epsr_mean, 252) / close, 126), subindustry) - 0.5 * group_rank(ts_rank(ts_decay_linear((close - vwap) / vwap, 10), 126), subindustry)",
+    "expression_hash": "9c6fb8470b484d802b3a196a18af5ed969f9b8dc534d369e72fc3cdf26074345",
+    "last_backtested": "2026-09-29T23:49:55.478899",
+    "metrics": {
+      "AlphaId": "rKe1mOzd",
+      "SharpeRatio": -1.084,
+      "SortinoRatio": -0.097,
+      "MaxDrawdown": 0.3968,
+      "AnnualizedReturn": -0.1289,
+      "AverageTurnover": 0.3196,
+      "InitialEquity": 100000.0,
+      "FinalEquity": 66246.4,
+      "TradingDays": 752,
+      "CorrelationWithActivePortfolio": 0.548,
+      "EnsembleVerdict": "[REJECTED]"
+    }
+  },
+  "9qWzQLeK": {
+    "alpha_id": "9qWzQLeK",
+    "status": "ACTIVE",
+    "expression": " -1 * (group_rank(ts_decay_linear((close - open) / (open + 0.0001), 5), subindustry) - 0.5) + (group_rank(ts_rank(ts_backfill(vec_avg(nws12_mainz_div_y), 252), 66), subindustry) - 0.5)",
+    "expression_hash": "7e3010c9d20eff6131f8e538330369025f739a8ecff6eb0de1f7de12ad8b3c6b",
+    "last_backtested": "2026-09-29T23:49:58.000186",
+    "metrics": {
+      "AlphaId": "9qWzQLeK",
+      "SharpeRatio": -0.524,
+      "SortinoRatio": -0.051,
+      "MaxDrawdown": 0.2372,
+      "AnnualizedReturn": -0.0675,
+      "AverageTurnover": 0.3554,
+      "InitialEquity": 100000.0,
+      "FinalEquity": 81184.72,
+      "TradingDays": 752,
+      "CorrelationWithActivePortfolio": 0.574,
+      "EnsembleVerdict": "[REJECTED]"
+    }
+  },
+  "P0gJqVKq": {
+    "alpha_id": "P0gJqVKq",
+    "status": "ACTIVE",
+    "expression": "0.5 * group_rank(ts_rank(ts_backfill(anl4_afv4_eps_high, 252), 126), subindustry) - 0.5 * group_rank(ts_rank(ts_decay_linear((close - open) / open, 5), 20), subindustry)",
+    "expression_hash": "88711db0d9374aa2918801bec9c8ae47028c48f304236d58abdefdd6c58c8f8d",
+    "last_backtested": "2026-09-29T23:50:00.786772",
+    "metrics": {
+      "AlphaId": "P0gJqVKq",
+      "SharpeRatio": -0.524,
+      "SortinoRatio": -0.051,
+      "MaxDrawdown": 0.2372,
+      "AnnualizedReturn": -0.0675,
+      "AverageTurnover": 0.3554,
+      "InitialEquity": 100000.0,
+      "FinalEquity": 81184.72,
+      "TradingDays": 752,
+      "CorrelationWithActivePortfolio": 0.574,
+      "EnsembleVerdict": "[REJECTED]"
+    }
+  },
+  "vR2KelW3": {
+    "alpha_id": "vR2KelW3",
+    "status": "ACTIVE",
+    "expression": "group_rank(ts_rank(gross_income_reported_value / est_tot_assets, 126), subindustry) - group_rank(ts_rank(close / vwap, 10), subindustry)",
+    "expression_hash": "d077eb8e798d2a407479a6b7c676e4a6e0b9a47bcdccff468b32dc42e455489f",
+    "last_backtested": "2026-09-29T23:50:03.473918",
+    "metrics": {
+      "AlphaId": "vR2KelW3",
+      "SharpeRatio": -1.084,
+      "SortinoRatio": -0.097,
+      "MaxDrawdown": 0.3968,
+      "AnnualizedReturn": -0.1289,
+      "AverageTurnover": 0.3196,
+      "InitialEquity": 100000.0,
+      "FinalEquity": 66246.4,
+      "TradingDays": 752,
+      "CorrelationWithActivePortfolio": 0.548,
+      "EnsembleVerdict": "[REJECTED]"
+    }
+  },
+  "GrOqG8NG": {
+    "alpha_id": "GrOqG8NG",
+    "status": "ACTIVE",
+    "expression": "0.5 * group_rank(ts_rank(ts_backfill(anl4_fcf_mean, 252), 126), subindustry) - 0.5 * group_rank(ts_rank(ts_decay_linear((close - open) / open, 4), 20), subindustry)",
+    "expression_hash": "d06a541f326838f903bf6b917dfd77c4ee2b082e91dc3a0debd8d2406efb5ff3",
+    "last_backtested": "2026-09-29T23:50:07.484302",
+    "metrics": {
+      "AlphaId": "GrOqG8NG",
+      "SharpeRatio": -0.524,
+      "SortinoRatio": -0.051,
+      "MaxDrawdown": 0.2372,
+      "AnnualizedReturn": -0.0675,
+      "AverageTurnover": 0.3554,
+      "InitialEquity": 100000.0,
+      "FinalEquity": 81184.72,
+      "TradingDays": 752,
+      "CorrelationWithActivePortfolio": 0.574,
+      "EnsembleVerdict": "[REJECTED]"
+    }
+  },
+  "N1VXbVbo": {
+    "alpha_id": "N1VXbVbo",
+    "status": "ACTIVE",
+    "expression": "group_rank(ts_rank(ts_backfill(anl4_fs_detail_estimate_1qf_v4_nd_epsr_high, 252) / close, 126), subindustry) - group_rank(ts_rank(returns, 10), subindustry)",
+    "expression_hash": "dfa9fb8f87c1cf9a42e338a47a058f8a4bfcab26401faa65a517c6ec49e4b5ae",
+    "last_backtested": "2026-09-29T23:50:14.575682",
+    "metrics": {
+      "AlphaId": "N1VXbVbo",
+      "SharpeRatio": -1.046,
+      "SortinoRatio": -0.091,
+      "MaxDrawdown": 0.3601,
+      "AnnualizedReturn": -0.1147,
+      "AverageTurnover": 0.2238,
+      "InitialEquity": 100000.0,
+      "FinalEquity": 69523.69,
+      "TradingDays": 752,
+      "CorrelationWithActivePortfolio": 0.782,
+      "EnsembleVerdict": "[REJECTED]"
+    }
+  },
+  "O0816Lr7": {
+    "alpha_id": "O0816Lr7",
+    "status": "ACTIVE",
+    "expression": "0.5 * group_rank(ts_rank(ts_backfill(anl4_ptp_value, 252), 126), subindustry) - 0.5 * group_rank(ts_rank(ts_decay_linear(returns, 5), 20), subindustry)",
+    "expression_hash": "f4feb99836ac198002eace4e61b761ae9b5347be03b3a1bbf293241ea0675123",
+    "last_backtested": "2026-09-29T23:50:17.619480",
+    "metrics": {
+      "AlphaId": "O0816Lr7",
+      "SharpeRatio": -1.046,
+      "SortinoRatio": -0.091,
+      "MaxDrawdown": 0.3601,
+      "AnnualizedReturn": -0.1147,
+      "AverageTurnover": 0.2238,
+      "InitialEquity": 100000.0,
+      "FinalEquity": 69523.69,
+      "TradingDays": 752,
+      "CorrelationWithActivePortfolio": 0.782,
+      "EnsembleVerdict": "[REJECTED]"
+    }
+  },
+  "2rm1ePwb": {
+    "alpha_id": "2rm1ePwb",
+    "status": "ACTIVE",
+    "expression": "0.5 * group_rank(ts_rank(ts_backfill(anl4_fs_detail_estimates_advanced_af_nd_sh_equity_std, 252), 126), subindustry) - 0.5 * group_rank(ts_rank(returns, 20), subindustry)",
+    "expression_hash": "021ef4dab5ded0ba62ea2fa589eb20ae51408ef96662c694fa8702758274de35",
+    "last_backtested": "2026-09-30T00:37:51.766875",
+    "metrics": {
+      "AlphaId": "2rm1ePwb",
+      "SharpeRatio": 1.379,
+      "SortinoRatio": 0.13,
+      "MaxDrawdown": 0.0629,
+      "AnnualizedReturn": 0.1402,
+      "AverageTurnover": 0.241,
+      "InitialEquity": 100000.0,
+      "FinalEquity": 147938.57,
+      "TradingDays": 752,
+      "CorrelationWithActivePortfolio": -0.98,
+      "EnsembleVerdict": "[ACCEPTED FOR LIVE ROUTING]"
+    }
+  },
+  "QPK1o3Ng": {
+    "alpha_id": "QPK1o3Ng",
+    "status": "ACTIVE",
+    "expression": "0.5 * group_rank(ts_rank(ts_backfill(anl4_fs_actuals_advanced_af_nd_ptp_value, 252) / close, 126), subindustry) - 0.5 * group_rank(ts_rank(ts_decay_linear(returns, 5), 20), subindustry)",
+    "expression_hash": "2530c234727899fd73b2cf2dd6055acae531f64f87f22c6e1b272eaff16fbbfc",
+    "last_backtested": "2026-09-30T00:37:53.774027",
+    "metrics": {
+      "AlphaId": "QPK1o3Ng",
+      "SharpeRatio": -1.046,
+      "SortinoRatio": -0.091,
+      "MaxDrawdown": 0.3601,
+      "AnnualizedReturn": -0.1147,
+      "AverageTurnover": 0.2238,
+      "InitialEquity": 100000.0,
+      "FinalEquity": 69523.69,
+      "TradingDays": 752,
+      "CorrelationWithActivePortfolio": 0.782,
+      "EnsembleVerdict": "[REJECTED]"
+    }
+  },
+  "88j2G0ZV_INV": {
+    "alpha_id": "88j2G0ZV_INV",
+    "status": "INVERTED_SIBLING",
+    "expression": "-1.0 * (rank(ts_sum(vec_avg(nws12_afterhsz_sl), 60)) * rank(-ts_delta(close, 2)))",
+    "expression_hash": "4f144065156e55988c99b97c91c20173b73a60a37bd2bc5b417b876f26720776",
+    "last_backtested": "2026-09-30T01:08:58.565206",
+    "metrics": {
+      "AlphaId": "88j2G0ZV_INV",
+      "SharpeRatio": 1.265,
+      "SortinoRatio": 0.121,
+      "MaxDrawdown": 0.0908,
+      "AnnualizedReturn": 0.1354,
+      "AverageTurnover": 0.4731,
+      "InitialEquity": 100000.0,
+      "FinalEquity": 146068.88,
+      "TradingDays": 752,
+      "CorrelationWithActivePortfolio": -0.423,
+      "EnsembleVerdict": "[ACCEPTED FOR LIVE ROUTING]"
+    }
+  },
+  "wpZvNlv1_INV": {
+    "alpha_id": "wpZvNlv1_INV",
+    "status": "INVERTED_SIBLING",
+    "expression": "-1.0 * (rank(-ts_delta(close, 1)) * rank(volume / ts_mean(volume, 100)))",
+    "expression_hash": "2150eee7c8f0ea1a0e5bf36b9477f2e457d0dc5385f3dd7259a8c4b7ddff23f5",
+    "last_backtested": "2026-09-30T01:09:01.818244",
+    "metrics": {
+      "AlphaId": "wpZvNlv1_INV",
+      "SharpeRatio": 1.192,
+      "SortinoRatio": 0.114,
+      "MaxDrawdown": 0.0962,
+      "AnnualizedReturn": 0.121,
+      "AverageTurnover": 0.3281,
+      "InitialEquity": 100000.0,
+      "FinalEquity": 140599.56,
+      "TradingDays": 752,
+      "CorrelationWithActivePortfolio": -0.952,
+      "EnsembleVerdict": "[ACCEPTED FOR LIVE ROUTING]"
+    }
+  },
+  "vRro8eqa_INV": {
+    "alpha_id": "vRro8eqa_INV",
+    "status": "INVERTED_SIBLING",
+    "expression": "-1.0 * (group_rank( ts_rank( operating_income / equity - close / vwap, 66 ), subindustry ))",
+    "expression_hash": "d495374cfb090f8db584b6b7abd2c144b6d265c043672c5c40054d278f067545",
+    "last_backtested": "2026-09-30T01:09:05.240029",
+    "metrics": {
+      "AlphaId": "vRro8eqa_INV",
+      "SharpeRatio": 1.242,
+      "SortinoRatio": 0.114,
+      "MaxDrawdown": 0.0895,
+      "AnnualizedReturn": 0.1272,
+      "AverageTurnover": 0.3346,
+      "InitialEquity": 100000.0,
+      "FinalEquity": 142954.56,
+      "TradingDays": 752,
+      "CorrelationWithActivePortfolio": -0.951,
+      "EnsembleVerdict": "[ACCEPTED FOR LIVE ROUTING]"
+    }
+  },
+  "rKe1mOzd_INV": {
+    "alpha_id": "rKe1mOzd_INV",
+    "status": "INVERTED_SIBLING",
+    "expression": "-1.0 * (0.5 * group_rank(ts_rank(ts_backfill(anl4_fs_detail_estimates_advanced_af_nd_epsr_mean, 252) / close, 126), subindustry) - 0.5 * group_rank(ts_rank(ts_decay_linear((close - vwap) / vwap, 10), 126), subindustry))",
+    "expression_hash": "96af2df472aa96f03e122703deb813fc3d4c518b2167b3b21fd60b894abf4491",
+    "last_backtested": "2026-09-30T01:09:25.665317",
+    "metrics": {
+      "AlphaId": "rKe1mOzd_INV",
+      "SharpeRatio": 1.084,
+      "SortinoRatio": 0.105,
+      "MaxDrawdown": 0.0829,
+      "AnnualizedReturn": 0.1313,
+      "AverageTurnover": 0.3196,
+      "InitialEquity": 100000.0,
+      "FinalEquity": 144517.88,
+      "TradingDays": 752,
+      "CorrelationWithActivePortfolio": -0.548,
+      "EnsembleVerdict": "[REJECTED]"
+    }
+  },
+  "vR2KelW3_INV": {
+    "alpha_id": "vR2KelW3_INV",
+    "status": "INVERTED_SIBLING",
+    "expression": "-1.0 * (group_rank(ts_rank(gross_income_reported_value / est_tot_assets, 126), subindustry) - group_rank(ts_rank(close / vwap, 10), subindustry))",
+    "expression_hash": "0a5048826c6c115fd8c60bba40c03e2fa63446a852c9e4532a0d9099af86f468",
+    "last_backtested": "2026-09-30T01:09:31.739508",
+    "metrics": {
+      "AlphaId": "vR2KelW3_INV",
+      "SharpeRatio": 1.219,
+      "SortinoRatio": 0.115,
+      "MaxDrawdown": 0.0982,
+      "AnnualizedReturn": 0.1245,
+      "AverageTurnover": 0.3431,
+      "InitialEquity": 100000.0,
+      "FinalEquity": 141923.3,
+      "TradingDays": 752,
+      "CorrelationWithActivePortfolio": -0.959,
+      "EnsembleVerdict": "[ACCEPTED FOR LIVE ROUTING]"
+    }
+  },
+  "N1VXbVbo_INV": {
+    "alpha_id": "N1VXbVbo_INV",
+    "status": "INVERTED_SIBLING",
+    "expression": "-1.0 * (group_rank(ts_rank(ts_backfill(anl4_fs_detail_estimate_1qf_v4_nd_epsr_high, 252) / close, 126), subindustry) - group_rank(ts_rank(returns, 10), subindustry))",
+    "expression_hash": "6065c9d657ca3bf7236bd20e7409245ccc4ca2ed7c2de9180adf35f683a45652",
+    "last_backtested": "2026-09-30T01:09:37.488324",
+    "metrics": {
+      "AlphaId": "N1VXbVbo_INV",
+      "SharpeRatio": 1.565,
+      "SortinoRatio": 0.151,
+      "MaxDrawdown": 0.1754,
+      "AnnualizedReturn": 0.233,
+      "AverageTurnover": 0.1625,
+      "InitialEquity": 100000.0,
+      "FinalEquity": 186807.21,
+      "TradingDays": 752,
+      "CorrelationWithActivePortfolio": -0.275,
+      "EnsembleVerdict": "[ACCEPTED FOR LIVE ROUTING]"
+    }
+  },
+  "O0816Lr7_INV": {
+    "alpha_id": "O0816Lr7_INV",
+    "status": "INVERTED_SIBLING",
+    "expression": "-1.0 * (0.5 * group_rank(ts_rank(ts_backfill(anl4_ptp_value, 252), 126), subindustry) - 0.5 * group_rank(ts_rank(ts_decay_linear(returns, 5), 20), subindustry))",
+    "expression_hash": "355bc8156e717066182eef88036a28bd48a2fc080387bb0b6ae627674e2462c4",
+    "last_backtested": "2026-09-30T01:09:41.873053",
+    "metrics": {
+      "AlphaId": "O0816Lr7_INV",
+      "SharpeRatio": 1.046,
+      "SortinoRatio": 0.102,
+      "MaxDrawdown": 0.0735,
+      "AnnualizedReturn": 0.1158,
+      "AverageTurnover": 0.2238,
+      "InitialEquity": 100000.0,
+      "FinalEquity": 138659.61,
+      "TradingDays": 752,
+      "CorrelationWithActivePortfolio": -0.782,
+      "EnsembleVerdict": "[REJECTED]"
+    }
+  },
+  "QPK1o3Ng_INV": {
+    "alpha_id": "QPK1o3Ng_INV",
+    "status": "INVERTED_SIBLING",
+    "expression": "-1.0 * (0.5 * group_rank(ts_rank(ts_backfill(anl4_fs_actuals_advanced_af_nd_ptp_value, 252) / close, 126), subindustry) - 0.5 * group_rank(ts_rank(ts_decay_linear(returns, 5), 20), subindustry))",
+    "expression_hash": "dd2a945186b6bba393a9560e8cc07a13035e4013e1a5ea8a5828529a1b137679",
+    "last_backtested": "2026-09-30T01:09:48.440283",
+    "metrics": {
+      "AlphaId": "QPK1o3Ng_INV",
+      "SharpeRatio": 1.046,
+      "SortinoRatio": 0.102,
+      "MaxDrawdown": 0.0735,
+      "AnnualizedReturn": 0.1158,
+      "AverageTurnover": 0.2238,
+      "InitialEquity": 100000.0,
+      "FinalEquity": 138659.61,
+      "TradingDays": 752,
+      "CorrelationWithActivePortfolio": -0.782,
+      "EnsembleVerdict": "[REJECTED]"
+    }
+  }
+}

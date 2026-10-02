@@ -1,5 +1,5 @@
 # QuantConnect LEAN Algorithm - Project Chronos Multi-Alpha Orthogonal Ensemble Strategy
-# Qualified Alphas (16): ["rKOZWNJJ", "E5p9K3gr", "d5bNdNVX", "MPa2Mmlz", "9qjkndAe", "3qXJ27LN", "omLZoqXl", "A1NmeMQY", "gJbG5Qrm", "78NeYnPb", "2rm1ePwb", "88j2G0ZV_INV", "wpZvNlv1_INV", "vRro8eqa_INV", "vR2KelW3_INV", "N1VXbVbo_INV"]
+# Qualified Alphas (7): ["E5p9K3gr", "9qjkndAe", "3qXJ27LN", "omLZoqXl", "A1NmeMQY", "gJbG5Qrm", "rKe1mOzd_INV"]
 # Risk-Parity Weighted across Fundamental Quality and Valuation Spread Drivers
 
 from AlgorithmImports import *
@@ -39,22 +39,13 @@ class ProjectChronosEnsemble(QCAlgorithm):
         
         # Risk-Parity Alpha Weights
         self.alpha_weights = {
-            "rKOZWNJJ": 0.0672,
-            "E5p9K3gr": 0.056,
-            "d5bNdNVX": 0.0694,
-            "MPa2Mmlz": 0.0694,
-            "9qjkndAe": 0.056,
-            "3qXJ27LN": 0.056,
-            "omLZoqXl": 0.056,
-            "A1NmeMQY": 0.056,
-            "gJbG5Qrm": 0.056,
-            "78NeYnPb": 0.0694,
-            "2rm1ePwb": 0.0694,
-            "88j2G0ZV_INV": 0.0655,
-            "wpZvNlv1_INV": 0.0686,
-            "vRro8eqa_INV": 0.0682,
-            "vR2KelW3_INV": 0.0683,
-            "N1VXbVbo_INV": 0.0489
+            "E5p9K3gr": 0.1412,
+            "9qjkndAe": 0.1412,
+            "3qXJ27LN": 0.1412,
+            "omLZoqXl": 0.1412,
+            "A1NmeMQY": 0.1412,
+            "gJbG5Qrm": 0.1412,
+            "rKe1mOzd_INV": 0.1529
 }
 
     def Rebalance(self):

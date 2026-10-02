@@ -1,6 +1,7 @@
 # QuantConnect LEAN Algorithm - Transpiled from Project Alpha
 # Alpha ID: rKOZWNJJ
 # Original Expression: 0.5 * group_rank(ts_rank(operating_income / equity, 126), subindustry) + 0.5 * group_rank(ts_rank(est_eps / close, 126), industry)
+# [STANDARD POLARITY FACTOR]
 
 from AlgorithmImports import *
 import numpy as np
@@ -101,7 +102,7 @@ class AlphaStrategy(QCAlgorithm):
             price_delta = -(close[-1] - close[-2]) if len(close) > 1 else 0.0
             
             # Dimensionless momentum and reversal score
-            score = price_delta * vol_ratio
+            score = (price_delta * vol_ratio)
             return score
         except Exception:
             return 0.0

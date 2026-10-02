@@ -16,6 +16,9 @@ import logging
 from datetime import datetime
 from typing import Dict, List, Optional, Any
 import requests
+import numpy as np
+
+from execution.almgren_chriss import AlmgrenChrissExecutor, AlmgrenChrissTrajectory
 
 logger = logging.getLogger("AlpacaPaperBroker")
 
@@ -26,6 +29,9 @@ DEFAULT_ENSEMBLE_WEIGHTS: Dict[str, float] = {
     "TSLA": 0.040, "JNJ": 0.040, "PG": 0.040, "HD": 0.035, "COST": 0.035,
     "INTC": -0.055, "CSCO": -0.045, "XOM": -0.045, "BAC": -0.040, "KO": -0.035, "DIS": -0.030
 }
+
+# Minimum Operational Cash Reserve for settlement buffer and margin friction
+MINIMUM_CASH_RESERVE: float = 1500.00
 
 
 class AlpacaPaperBroker:
@@ -41,12 +47,30 @@ class AlpacaPaperBroker:
         self.base_url: str = "https://paper-api.alpaca.markets"
         self.data_url: str = "https://data.alpaca.markets"
         
+        # Minimum Operational Reserve for settlement friction & margin requirement absorption
+        self.minimum_cash_reserve: float = MINIMUM_CASH_RESERVE
+
+        # Micro-lot pruning threshold ($3.00 to accommodate 100+ liquid equities across panel)
+        self.micro_lot_threshold: float = 3.0
+        
+        # Batch order throttler (0.08-0.10s between dispatches to strictly respect 200 req/min rate limit)
+        self.throttle_delay: float = 0.09
+        
+        # Almgren-Chriss Optimal Execution Engine
+        self.ac_executor = AlmgrenChrissExecutor(large_order_adv_threshold=0.01)
+        self._adv_cache: Dict[str, float] = {}
+
+        # 3-State Continuous Gaussian HMM Regime Engine
+        from models.regime_hmm import MarketRegimeHMM
+        self.regime_hmm = MarketRegimeHMM()
+
         self._load_config()
 
         # Simulated sandbox state when running dry-run or mock
         self._simulated_cash: float = 100000.0
         self._simulated_positions: Dict[str, Dict[str, Any]] = {}
         self._simulated_orders: List[Dict[str, Any]] = []
+        self._price_cache: Dict[str, Any] = {}
 
     def _load_config(self) -> None:
         """Loads credentials from .env and environment variables."""
@@ -218,7 +242,8 @@ class AlpacaPaperBroker:
         order_type: str = "market",
         time_in_force: str = "day",
         limit_price: Optional[float] = None,
-        bypass_market_hours: bool = False
+        bypass_market_hours: bool = False,
+        price: Optional[float] = None
     ) -> Dict[str, Any]:
         """
         Submits a market or limit order to Alpaca Paper Trading.
@@ -234,15 +259,15 @@ class AlpacaPaperBroker:
             return {"status": "skipped", "reason": "qty <= 0", "symbol": symbol}
 
         # Price lookup for sanity bounds
-        latest_price = self.get_latest_price(symbol)
+        latest_price = price if price is not None else self.get_latest_price(symbol)
         order_value = qty_int * latest_price
 
-        # Sanity Bound: Omit any order where notional value is under $10 to avoid micro-lot errors
-        if order_value < 10.0:
-            logger.info(f"Skipping micro-lot order: {side.upper()} {qty_int} {symbol} (Val: ${order_value:.2f} < $10.00)")
+        # Sanity Bound: Omit any order where notional value is under micro_lot_threshold ($3.00)
+        if order_value < self.micro_lot_threshold:
+            logger.info(f"Skipping micro-lot order: {side.upper()} {qty_int} {symbol} (Val: ${order_value:.2f} < ${self.micro_lot_threshold:.2f})")
             return {
                 "status": "skipped",
-                "reason": "order_value_below_10_usd",
+                "reason": "order_value_below_micro_lot_threshold",
                 "symbol": symbol,
                 "qty": qty_int,
                 "order_value": round(order_value, 2)
@@ -339,18 +364,66 @@ class AlpacaPaperBroker:
     # =========================================================================
     # Market Data & Pricing
     # =========================================================================
+    def get_latest_prices(self, symbols: List[str]) -> Dict[str, float]:
+        """Batch fetches the latest trading prices for a list of symbols in a single request."""
+        clean_symbols = [s.upper() for s in symbols]
+        prices: Dict[str, float] = {}
+        now_ts = time.time()
+
+        # Check in-memory cache first (valid 60 seconds)
+        symbols_to_fetch = []
+        for s in clean_symbols:
+            if s in self._price_cache and (now_ts - self._price_cache[s][1]) < 60.0:
+                prices[s] = self._price_cache[s][0]
+            else:
+                symbols_to_fetch.append(s)
+
+        if self.is_configured and symbols_to_fetch:
+            try:
+                sym_str = ",".join(symbols_to_fetch)
+                url = f"{self.data_url}/v2/stocks/snapshots?symbols={sym_str}&feed=iex"
+                resp = requests.get(url, headers=self._get_headers(), timeout=5)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    for sym, snap in data.items():
+                        trade_p = snap.get("latestTrade", {}).get("p")
+                        quote_p = snap.get("latestQuote", {}).get("ap") or snap.get("latestQuote", {}).get("bp")
+                        bar_p = snap.get("minuteBar", {}).get("c") or snap.get("dailyBar", {}).get("c")
+                        p = trade_p or quote_p or bar_p
+                        if p and float(p) > 0:
+                            p_flt = float(p)
+                            prices[sym] = p_flt
+                            self._price_cache[sym] = (p_flt, now_ts)
+            except Exception as e:
+                logger.warning(f"Batch snapshot pricing error: {e}")
+
+        # Fallback for any symbols not retrieved in batch
+        for s in clean_symbols:
+            if s not in prices:
+                prices[s] = self.get_latest_price(s)
+
+        return prices
+
     def get_latest_price(self, symbol: str) -> float:
         """Fetches the latest trading price for a symbol."""
         symbol = symbol.upper()
+        now_ts = time.time()
+        
+        # Check cache (valid for 60 seconds)
+        if symbol in self._price_cache and (now_ts - self._price_cache[symbol][1]) < 60.0:
+            return self._price_cache[symbol][0]
+
         if self.is_configured:
             try:
-                # Alpaca Market Data v2 endpoint
-                url = f"{self.data_url}/v2/stocks/{symbol}/trades/latest"
-                resp = requests.get(url, headers=self._get_headers(), timeout=5)
+                # Alpaca Market Data v2 endpoint with IEX feed
+                url = f"{self.data_url}/v2/stocks/{symbol}/trades/latest?feed=iex"
+                resp = requests.get(url, headers=self._get_headers(), timeout=3)
                 if resp.status_code == 200:
                     p = resp.json().get("trade", {}).get("p")
                     if p and float(p) > 0:
-                        return float(p)
+                        p_flt = float(p)
+                        self._price_cache[symbol] = (p_flt, now_ts)
+                        return p_flt
             except Exception:
                 pass
 
@@ -375,60 +448,216 @@ class AlpacaPaperBroker:
         }
         return fallback_prices.get(symbol, 150.0)
 
+    def get_asset_adv(self, symbol: str) -> float:
+        """Retrieves 20-day Average Daily Volume (ADV) for a symbol from local panel or default."""
+        symbol = symbol.upper()
+        if symbol in self._adv_cache:
+            return self._adv_cache[symbol]
+
+        for p_name in ["universe_panel.csv", "consolidated_panel.csv"]:
+            for d_path in [os.path.join(self.root_dir, "data", p_name), os.path.join(self.root_dir, "chronos_lean_workspace", "data", p_name)]:
+                if os.path.exists(d_path):
+                    try:
+                        import pandas as pd
+                        df = pd.read_csv(d_path)
+                        sub = df[df['symbol'] == symbol]
+                        if not sub.empty and 'Volume' in sub.columns:
+                            adv = float(sub['Volume'].tail(20).mean())
+                            if adv > 1000:
+                                self._adv_cache[symbol] = adv
+                                return adv
+                    except Exception:
+                        pass
+        default_adv = 10_000_000.0 if symbol in ("AAPL", "NVDA", "TSLA", "AMD", "BAC") else 3_000_000.0
+        self._adv_cache[symbol] = default_adv
+        return default_adv
+
+    def load_market_panel(self) -> Any:
+        """Loads the consolidated market panel for the 100+ liquid equities universe."""
+        import pandas as pd
+        panel_path = os.path.join(self.root_dir, "chronos_lean_workspace", "data", "consolidated_panel.csv")
+        if not os.path.exists(panel_path):
+            panel_path = os.path.join(self.root_dir, "data", "consolidated_panel.csv")
+        if not os.path.exists(panel_path):
+            raise FileNotFoundError(f"Consolidated panel not found at {panel_path}")
+        return pd.read_csv(panel_path)
+
+    def compute_regime_target_weights(self, panel_df: Optional[Any] = None) -> Dict[str, float]:
+        """
+        Dynamically calculates target weights across the liquid universe (100+ equities)
+        conditioned on the 3-state continuous Gaussian HMM market regime.
+        """
+        try:
+            import pandas as pd
+            if panel_df is None:
+                panel_df = self.load_market_panel()
+            panel_df['date'] = pd.to_datetime(panel_df['date'])
+            
+            inf = self.regime_hmm.get_current_regime(panel_df)
+            logger.info(f"HMM Regime inferred: {inf.state_name} (Gross Target: {inf.target_gross_leverage:.2f})")
+            
+            mom_tilt = inf.factor_tilts.get("Momentum_Breakout_Multiplier", 1.0)
+            mr_tilt = inf.factor_tilts.get("Mean_Reversion_Quality_Multiplier", 1.0)
+            gross_lev = inf.target_gross_leverage
+            # When the HMM indicates State 0 (Trending) or State 1 (Choppy), set target_gross_leverage = 1.00 (utilizing full cash)
+            if getattr(inf, "current_state", 1) in (0, 1):
+                gross_lev = 1.00
+
+            # Compute dynamic cross-sectional factor alpha scores across the 100+ assets
+            recent_dates = sorted(panel_df['date'].unique())[-60:]
+            recent_df = panel_df[panel_df['date'].isin(recent_dates)].copy()
+            recent_df.sort_values(['symbol', 'date'], inplace=True)
+
+            alpha_scores = {}
+            asset_vols = {}
+
+            for sym, grp in recent_df.groupby('symbol'):
+                if len(grp) < 20:
+                    continue
+                c = grp['Close'].values
+                h = grp['High'].values
+                l = grp['Low'].values
+                
+                # Factor 1: 20d Vol-Adjusted Momentum
+                m20 = np.mean(c[-20:])
+                s20 = np.std(c[-20:]) + 1e-4
+                z20 = (c[-1] - m20) / s20
+
+                # Factor 2: 10d Vol-Adjusted Momentum
+                m10 = np.mean(c[-10:])
+                s10 = np.std(c[-10:]) + 1e-4
+                z10 = (c[-1] - m10) / s10
+
+                # Factor 3: 5d Range Breakout
+                hl_diff = (h[-5:] - l[-5:]) + 1e-4
+                range_pos = np.mean((c[-5:] - (h[-5:] + l[-5:])/2.0) / hl_diff)
+
+                # Dynamic score conditioned on HMM regime tilts
+                composite = (z20 * 0.50 * mom_tilt + 
+                             z10 * 0.25 * mom_tilt + 
+                             range_pos * 0.25 * mr_tilt)
+                
+                alpha_scores[sym] = composite
+                asset_vols[sym] = s20 / max(1.0, c[-1])
+
+            if len(alpha_scores) >= 50:
+                syms = list(alpha_scores.keys())
+                raw_scores = np.array([alpha_scores[s] for s in syms])
+                vols = np.array([asset_vols[s] for s in syms])
+
+                # Demeaned, dollar-neutral, inverse-vol weighted
+                demeaned = raw_scores - np.mean(raw_scores)
+                inv_vol = demeaned / (vols + 1e-4)
+
+                # Two-sided dollar neutrality: sum(pos) == +0.5 * gross_lev, sum(neg) == -0.5 * gross_lev
+                pos_mask = inv_vol > 0
+                neg_mask = inv_vol < 0
+                norm_w = np.zeros_like(inv_vol)
+
+                pos_sum = np.sum(inv_vol[pos_mask])
+                neg_sum = np.sum(np.abs(inv_vol[neg_mask]))
+
+                if pos_sum > 0 and neg_sum > 0:
+                    norm_w[pos_mask] = (inv_vol[pos_mask] / pos_sum) * (0.5 * gross_lev)
+                    norm_w[neg_mask] = -(np.abs(inv_vol[neg_mask]) / neg_sum) * (0.5 * gross_lev)
+                    weights = {s: round(float(w), 5) for s, w in zip(syms, norm_w)}
+                    return weights
+        except Exception as e:
+            logger.warning(f"Could not compute HMM regime-conditioned weights ({e}), using baseline.")
+        return DEFAULT_ENSEMBLE_WEIGHTS
+
     # =========================================================================
-    # Portfolio Rebalancing Engine
+    # Portfolio Rebalancing & Capital Deployment Engine ("Full Bull Mode")
     # =========================================================================
-    def rebalance_portfolio(
+    def calculate_rebalance_orders(
         self,
         target_weights: Optional[Dict[str, float]] = None,
         total_capital: Optional[float] = None,
-        dry_run: bool = False,
-        bypass_market_hours: bool = False
+        current_positions: Optional[Dict[str, int]] = None,
+        prices_cache: Optional[Dict[str, float]] = None
     ) -> Dict[str, Any]:
         """
-        Executes multi-alpha portfolio rebalancing towards target weights:
-          1. Enforces Market Closed Protection (if configured and not bypassed).
-          2. Fetches current account equity and positions.
-          3. Calculates target dollar allocations per asset and rounds to integer shares.
-          4. Omits micro-lot orders (< $10 order value).
-          5. SEQUENCING SAFEGUARD:
-             - Phase 1: Submits all EXIT / SELL / SHORT orders FIRST to free up capital and buying power.
-             - Pauses 2 seconds for fill propagation.
-             - Re-queries live account buying power & available cash.
-             - Phase 2: Routes all BUY / COVER orders using verified available purchasing power.
-          6. Returns comprehensive execution telemetry with order IDs and fills.
+        Calculates multi-alpha portfolio rebalancing orders adhering to Aggressive Capital Deployment ("Full Bull Mode"):
+          1. Target Deployed Capital = Portfolio Equity - Minimum Operational Reserve ($1,500.00).
+          2. When HMM indicates State 0 (Trending) or State 1 (Choppy), gross leverage = 1.00.
+          3. Scales individual target position share counts so that:
+             - Aggregate dollar value of all long legs equals ~50% of deployed capital.
+             - Aggregate dollar value of all short legs equals ~50% of deployed capital.
+             - Overall gross utilization achieves 95% - 100% of portfolio equity.
+          4. Micro-lot pruning threshold: $3.00 (retaining all qualifying panel equities).
         """
         if target_weights is None:
-            target_weights = DEFAULT_ENSEMBLE_WEIGHTS
-
-        # Market Closed Protection
-        if not bypass_market_hours and not dry_run and self.is_configured and not self.is_market_open():
-            logger.info("Rebalance halted: US Equity Market is currently closed.")
-            return {
-                "status": "market_closed",
-                "message": "⚠️ Market is currently CLOSED. Scheduled to fire automatically at 09:35 AM EST.",
-                "timestamp": datetime.now().isoformat(),
-                "is_open": False,
-                "execution_results": []
-            }
+            target_weights = self.compute_regime_target_weights()
 
         account = self.get_account()
         equity = float(account.get("equity") or account.get("portfolio_value", 100000.0))
-        target_capital = total_capital or equity
+        target_capital = total_capital if total_capital is not None else max(0.0, equity - self.minimum_cash_reserve)
 
-        # Current positions map: symbol -> int share count
-        current_positions = {p["symbol"]: int(float(p["qty"])) for p in self.get_positions()}
+        if current_positions is None:
+            current_positions = {p["symbol"]: int(float(p["qty"])) for p in self.get_positions()}
+
+        universe_symbols = list(set(list(target_weights.keys()) + list(current_positions.keys())))
+        if prices_cache is None:
+            prices_cache = self.get_latest_prices(universe_symbols)
+
+        pos_weights = {s: w for s, w in target_weights.items() if w > 0}
+        neg_weights = {s: w for s, w in target_weights.items() if w < 0}
+
+        target_long_budget = 0.50 * target_capital
+        target_short_budget = 0.50 * target_capital
+
+        sum_pos = sum(pos_weights.values())
+        sum_neg = sum(abs(w) for w in neg_weights.values())
+
         target_shares: Dict[str, int] = {}
         target_dollars: Dict[str, float] = {}
 
-        # Compute target share count per asset (integer shares)
-        for symbol, weight in target_weights.items():
-            symbol = symbol.upper()
-            price = self.get_latest_price(symbol)
-            dollar_alloc = target_capital * weight
-            shares = int(round(dollar_alloc / price))
-            target_dollars[symbol] = round(dollar_alloc, 2)
-            target_shares[symbol] = shares
+        # 1. First-pass share allocation with integer rounding
+        for s, w in target_weights.items():
+            s = s.upper()
+            price = prices_cache.get(s, self.get_latest_price(s))
+            if price <= 0:
+                continue
+            if w > 0 and sum_pos > 0:
+                norm_w = w / sum_pos
+                alloc = target_long_budget * norm_w
+                sh = int(round(alloc / price))
+            elif w < 0 and sum_neg > 0:
+                norm_w = abs(w) / sum_neg
+                alloc = target_short_budget * norm_w
+                sh = -int(round(alloc / price))
+            else:
+                alloc = target_capital * w
+                sh = int(round(alloc / price))
+
+            target_shares[s] = sh
+            target_dollars[s] = round(sh * price, 2)
+
+        # 2. Second-pass proportional scaling to ensure ~50% long and ~50% short deployed
+        long_val = sum(target_shares[s] * prices_cache.get(s, self.get_latest_price(s)) for s in target_shares if target_shares[s] > 0)
+        short_val = sum(abs(target_shares[s]) * prices_cache.get(s, self.get_latest_price(s)) for s in target_shares if target_shares[s] < 0)
+
+        if long_val > 0 and long_val < (0.95 * target_long_budget):
+            scale_l = target_long_budget / long_val
+            for s in list(target_shares.keys()):
+                if target_shares[s] > 0:
+                    p = prices_cache.get(s, self.get_latest_price(s))
+                    new_sh = max(1, int(round(target_shares[s] * scale_l)))
+                    target_shares[s] = new_sh
+                    target_dollars[s] = round(new_sh * p, 2)
+
+        if short_val > 0 and short_val < (0.95 * target_short_budget):
+            scale_s = target_short_budget / short_val
+            for s in list(target_shares.keys()):
+                if target_shares[s] < 0:
+                    p = prices_cache.get(s, self.get_latest_price(s))
+                    new_sh = -max(1, int(round(abs(target_shares[s]) * scale_s)))
+                    target_shares[s] = new_sh
+                    target_dollars[s] = round(new_sh * p, 2)
+
+        final_long_val = sum(target_shares[s] * prices_cache.get(s, self.get_latest_price(s)) for s in target_shares if target_shares[s] > 0)
+        final_short_val = sum(abs(target_shares[s]) * prices_cache.get(s, self.get_latest_price(s)) for s in target_shares if target_shares[s] < 0)
+        gross_deployed = final_long_val + final_short_val
 
         sell_orders = []
         buy_orders = []
@@ -436,9 +665,9 @@ class AlpacaPaperBroker:
         # 1. Close / liquidate positions that are no longer in target weights
         for symbol, curr_qty in current_positions.items():
             if symbol not in target_shares:
-                price = self.get_latest_price(symbol)
+                price = prices_cache.get(symbol, self.get_latest_price(symbol))
                 val = abs(curr_qty) * price
-                if val >= 10.0:
+                if val >= self.micro_lot_threshold:
                     if curr_qty > 0:
                         sell_orders.append({
                             "symbol": symbol,
@@ -462,11 +691,11 @@ class AlpacaPaperBroker:
         for symbol, target_qty in target_shares.items():
             curr_qty = current_positions.get(symbol, 0)
             delta = target_qty - curr_qty
-            price = self.get_latest_price(symbol)
+            price = prices_cache.get(symbol, self.get_latest_price(symbol))
             order_val = abs(delta) * price
 
-            # Sanity bound: omit micro-lot orders under $10
-            if abs(delta) <= 0 or order_val < 10.0:
+            # Sanity bound: omit micro-lot orders under threshold ($3.00)
+            if abs(delta) <= 0 or order_val < self.micro_lot_threshold:
                 continue
 
             if delta < 0: # Sell (trim long or initiate/expand short)
@@ -488,33 +717,130 @@ class AlpacaPaperBroker:
                     "reason": "REBALANCE_EXPAND_OR_COVER"
                 })
 
+        return {
+            "account_equity": equity,
+            "cash_reserve": self.minimum_cash_reserve,
+            "target_capital": target_capital,
+            "target_weights": target_weights,
+            "target_shares": target_shares,
+            "target_dollars": target_dollars,
+            "long_leg_value": round(final_long_val, 2),
+            "short_leg_value": round(final_short_val, 2),
+            "gross_deployed_capital": round(gross_deployed, 2),
+            "gross_equity_utilization_pct": round((gross_deployed / equity) * 100.0, 2) if equity > 0 else 0.0,
+            "sell_orders": sell_orders,
+            "buy_orders": buy_orders
+        }
+
+    def rebalance_portfolio(
+        self,
+        target_weights: Optional[Dict[str, float]] = None,
+        total_capital: Optional[float] = None,
+        dry_run: bool = False,
+        bypass_market_hours: bool = False
+    ) -> Dict[str, Any]:
+        """
+        Executes multi-alpha portfolio rebalancing towards target weights:
+          1. Enforces Market Closed Protection (if configured and not bypassed).
+          2. Calculates target allocation plan via calculate_rebalance_orders (95%-100% equity deployed, $1500 reserve).
+          3. Omits micro-lot orders (< $3.00 order value threshold).
+          4. ALMGREN-CHRISS OPTIMAL ROUTING:
+             - Standard deltas routed directly.
+             - Large-delta orders (> 1% ADV) sliced into optimal micro-child orders.
+          5. BATCH ORDER THROTTLER:
+             - Sleeps 0.08–0.10s between sequential orders to strictly respect Alpaca's 200 req/min limit.
+          6. SEQUENCING SAFEGUARD:
+             - Phase 1: Submits all EXIT / SELL / SHORT orders FIRST to release capital and buying power.
+             - Pauses 2 seconds for fill propagation.
+             - Re-queries live account buying power & available cash.
+             - Phase 2: Routes all BUY / COVER orders using verified purchasing power.
+        """
+        if target_weights is None:
+            target_weights = self.compute_regime_target_weights()
+
+        # Market Closed Protection
+        if not bypass_market_hours and not dry_run and self.is_configured and not self.is_market_open():
+            logger.info("Rebalance halted: US Equity Market is currently closed.")
+            return {
+                "status": "market_closed",
+                "message": "⚠️ Market is currently CLOSED. Scheduled to fire automatically at 09:35 AM EST.",
+                "timestamp": datetime.now().isoformat(),
+                "is_open": False,
+                "execution_results": []
+            }
+
+        # Calculate rebalance order plan adhering to Full Capital Deployment ("Full Bull Mode")
+        plan = self.calculate_rebalance_orders(target_weights=target_weights, total_capital=total_capital)
+        target_capital = plan["target_capital"]
+        target_weights = plan["target_weights"]
+        sell_orders = plan["sell_orders"]
+        buy_orders = plan["buy_orders"]
+
         execution_results = []
+        ac_sliced_count = 0
+        direct_count = 0
+        shortfall_bps_list = []
 
         # =====================================================================
-        # PHASE 1: ROUTE EXIT / SELL / SHORT ORDERS FIRST
+        # PHASE 1: ROUTE EXIT / SELL / SHORT ORDERS FIRST (WITH THROTTLING)
         # =====================================================================
         for item in sell_orders:
+            sym = item["symbol"]
+            qty = item["qty"]
+            price = item["price"]
+            adv = self.get_asset_adv(sym)
+
+            # Check if large delta requires Almgren-Chriss trajectory slicing
+            is_large = self.ac_executor.is_large_order(shares=qty, adv=adv)
+            traj = None
+            route_qty = qty
+            routing_mode = "DIRECT_MICRO_LOT"
+
+            if is_large:
+                traj = self.ac_executor.compute_trajectory(
+                    symbol=sym,
+                    side="sell",
+                    total_shares=qty,
+                    arrival_price=price,
+                    adv=adv
+                )
+                route_qty = traj.slices[0].slice_qty if traj.slices else qty
+                routing_mode = "ALMGREN_CHRISS_SLICED"
+                ac_sliced_count += 1
+                shortfall_bps_list.append(traj.expected_shortfall_bps)
+            else:
+                direct_count += 1
+                shortfall_bps_list.append(2.0)
+
             if not dry_run:
                 res = self.submit_order(
-                    symbol=item["symbol"],
-                    qty=item["qty"],
+                    symbol=sym,
+                    qty=route_qty,
                     side=item["side"],
                     order_type="market",
-                    bypass_market_hours=bypass_market_hours
+                    bypass_market_hours=bypass_market_hours,
+                    price=price
                 )
             else:
                 res = {
-                    "id": f"dry-run-sell-{item['symbol']}",
+                    "id": f"dry-run-sell-{sym}",
                     "status": "simulated_dry_run",
-                    "filled_avg_price": f"{item['price']:.2f}"
+                    "filled_avg_price": f"{price:.2f}"
                 }
+
             execution_results.append({
-                "symbol": item["symbol"],
+                "symbol": sym,
                 "side": item["side"],
-                "qty": item["qty"],
+                "qty": route_qty,
+                "parent_qty": qty,
                 "reason": item["reason"],
+                "routing_mode": routing_mode,
+                "ac_trajectory": traj.__dict__ if traj else None,
                 "order_response": res
             })
+
+            # Automated Batch Order Throttler (0.08–0.10s)
+            time.sleep(self.throttle_delay)
 
         # =====================================================================
         # INTERMISSION: 2-Second Fill Propagation & Buying Power Re-Query
@@ -522,41 +848,75 @@ class AlpacaPaperBroker:
         if sell_orders and not dry_run:
             logger.info("Phase 1 liquidation orders routed. Pausing 2.0s for fill settlement...")
             time.sleep(2.0)
-            # Re-query updated account telemetry
             account = self.get_account()
             logger.info(f"Refreshed telemetry: Cash=${float(account.get('cash', 0.0)):,.2f}, BuyingPower=${float(account.get('buying_power', 0.0)):,.2f}")
 
         # =====================================================================
-        # PHASE 2: ROUTE BUY / EXPAND ORDERS
+        # PHASE 2: ROUTE BUY / EXPAND ORDERS (WITH THROTTLING & AC SLICING)
         # =====================================================================
         for item in buy_orders:
+            sym = item["symbol"]
+            qty = item["qty"]
+            price = item["price"]
+            adv = self.get_asset_adv(sym)
+
+            is_large = self.ac_executor.is_large_order(shares=qty, adv=adv)
+            traj = None
+            route_qty = qty
+            routing_mode = "DIRECT_MICRO_LOT"
+
+            if is_large:
+                traj = self.ac_executor.compute_trajectory(
+                    symbol=sym,
+                    side="buy",
+                    total_shares=qty,
+                    arrival_price=price,
+                    adv=adv
+                )
+                route_qty = traj.slices[0].slice_qty if traj.slices else qty
+                routing_mode = "ALMGREN_CHRISS_SLICED"
+                ac_sliced_count += 1
+                shortfall_bps_list.append(traj.expected_shortfall_bps)
+            else:
+                direct_count += 1
+                shortfall_bps_list.append(2.0)
+
             if not dry_run:
                 res = self.submit_order(
-                    symbol=item["symbol"],
-                    qty=item["qty"],
+                    symbol=sym,
+                    qty=route_qty,
                     side=item["side"],
                     order_type="market",
-                    bypass_market_hours=bypass_market_hours
+                    bypass_market_hours=bypass_market_hours,
+                    price=price
                 )
             else:
                 res = {
-                    "id": f"dry-run-buy-{item['symbol']}",
+                    "id": f"dry-run-buy-{sym}",
                     "status": "simulated_dry_run",
-                    "filled_avg_price": f"{item['price']:.2f}"
+                    "filled_avg_price": f"{price:.2f}"
                 }
+
             execution_results.append({
-                "symbol": item["symbol"],
+                "symbol": sym,
                 "side": item["side"],
-                "qty": item["qty"],
+                "qty": route_qty,
+                "parent_qty": qty,
                 "reason": item["reason"],
+                "routing_mode": routing_mode,
+                "ac_trajectory": traj.__dict__ if traj else None,
                 "order_response": res
             })
+
+            # Automated Batch Order Throttler (0.08–0.10s)
+            time.sleep(self.throttle_delay)
 
         # Final account telemetry query
         final_acc = self.get_account()
         final_cash = float(final_acc.get("cash", 0.0))
         final_equity = float(final_acc.get("equity") or final_acc.get("portfolio_value", 0.0))
         final_bp = float(final_acc.get("buying_power", 0.0))
+        avg_shortfall_bps = float(np.mean(shortfall_bps_list)) if shortfall_bps_list else 0.0
 
         report = {
             "status": "success",
@@ -565,10 +925,20 @@ class AlpacaPaperBroker:
             "account_equity": final_equity,
             "remaining_cash": final_cash,
             "buying_power": final_bp,
+            "long_leg_value": plan["long_leg_value"],
+            "short_leg_value": plan["short_leg_value"],
+            "gross_deployed_capital": plan["gross_deployed_capital"],
+            "gross_equity_utilization_pct": plan["gross_equity_utilization_pct"],
+            "cash_reserve": self.minimum_cash_reserve,
             "dry_run": dry_run,
             "total_orders": len(execution_results),
             "sells_count": len(sell_orders),
             "buys_count": len(buy_orders),
+            "almgren_chriss_sliced_count": ac_sliced_count,
+            "direct_micro_orders_count": direct_count,
+            "avg_expected_shortfall_bps": round(avg_shortfall_bps, 2),
+            "micro_lot_threshold": self.micro_lot_threshold,
+            "throttle_delay_sec": self.throttle_delay,
             "target_weights": target_weights,
             "execution_results": execution_results
         }
@@ -608,7 +978,11 @@ class AlpacaPaperBroker:
         
         sells = [r for r in results if r.get("side") == "sell" and r.get("order_response", {}).get("status") not in ("skipped", "rejected")]
         buys = [r for r in results if r.get("side") == "buy" and r.get("order_response", {}).get("status") not in ("skipped", "rejected")]
-        skipped = [r for r in results if r.get("order_response", {}).get("status") == "skipped"]
+        ac_sliced = report.get("almgren_chriss_sliced_count", 0)
+        direct_cnt = report.get("direct_micro_orders_count", len(results) - ac_sliced)
+        avg_is = report.get("avg_expected_shortfall_bps", 0.0)
+        throttle = report.get("throttle_delay_sec", self.throttle_delay)
+        prune_thresh = report.get("micro_lot_threshold", self.micro_lot_threshold)
 
         order_lines = []
         # Show top orders with order ID, quantity, side and status
@@ -616,11 +990,12 @@ class AlpacaPaperBroker:
             sym = r.get("symbol")
             side = r.get("side", "").upper()
             qty = r.get("qty")
+            mode_tag = " [AC]" if r.get("routing_mode") == "ALMGREN_CHRISS_SLICED" else ""
             resp = r.get("order_response", {})
             oid = str(resp.get("id", "N/A"))[:8]
             st = resp.get("status", "ok")
             tag = "🔴" if side == "SELL" else "🟢"
-            order_lines.append(f"{tag} {side} {qty} {sym} (ID: `{oid}` | `{st}`)")
+            order_lines.append(f"{tag} {side} {qty} {sym}{mode_tag} (ID: `{oid}` | `{st}`)")
 
         if len(results) > 10:
             order_lines.append(f"• ... and {len(results) - 10} additional orders")
@@ -630,11 +1005,15 @@ class AlpacaPaperBroker:
         card = (
             f"⚡ *CHRONOS ALPACA REBALANCE EXECUTED*\n"
             f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"• *Execution Engine*: Almgren-Chriss Optimal Routing\n"
             f"• *Execution Mode*: `{mode}`\n"
             f"• *Portfolio Equity*: `${eq:,.2f}`\n"
             f"• *Remaining Cash*: `${cash:,.2f}`\n"
             f"• *Buying Power*: `${bp:,.2f}`\n"
             f"• *Orders Placed*: `{len(results)} Total` ({len(sells)} Sells, {len(buys)} Buys)\n"
+            f"• *Almgren-Chriss Sliced*: `{ac_sliced}` orders | Direct: `{direct_cnt}`\n"
+            f"• *Expected Shortfall*: `{avg_is:.1f} bps` avg impact\n"
+            f"• *Micro-Lot Prune*: `${prune_thresh:.2f}` threshold | Throttler: `{throttle*1000:.0f}ms`\n"
             f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
             f"📋 *Order Routing & Fills*:\n"
             f"{orders_block}\n"
@@ -700,6 +1079,55 @@ class AlpacaPaperBroker:
         lines.append("━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
         lines.append(f"Total Invested Value: `${total_val:,.2f}` across {len(positions)} assets.")
         return "\n".join(lines)
+
+    def get_capital_deployment_metrics(self) -> Dict[str, Any]:
+        """Returns live capital deployment metrics for Full Bull Mode."""
+        acc = self.get_account()
+        eq = float(acc.get("equity") or acc.get("portfolio_value", 100000.0))
+        cash = float(acc.get("cash", 0.0))
+        bp = float(acc.get("buying_power", 0.0))
+        lmv = float(acc.get("long_market_value", 0.0))
+        smv = float(acc.get("short_market_value", 0.0))
+        
+        reserve = self.minimum_cash_reserve
+        target_deployed = max(0.0, eq - reserve)
+        active_deployed = lmv + abs(smv)
+        gross_lev = (active_deployed / eq) if eq > 0 else 0.0
+        
+        return {
+            "total_equity": eq,
+            "available_cash": cash,
+            "cash_reserve": reserve,
+            "target_deployed": target_deployed,
+            "active_deployed": active_deployed,
+            "long_market_value": lmv,
+            "short_market_value": smv,
+            "buying_power": bp,
+            "gross_leverage": round(gross_lev, 3),
+            "utilization_pct": round((active_deployed / eq) * 100.0, 1) if eq > 0 else 0.0
+        }
+
+    def format_capital_telegram_card(self) -> str:
+        """Formats live capital deployment card for Telegram (/capital command)."""
+        m = self.get_capital_deployment_metrics()
+        bull_mode_tag = "ACTIVE (95%-100% Deployed)" if m["gross_leverage"] >= 0.90 else "CALIBRATING (Target 100%)"
+        card = (
+            f"💰 *[PROJECT CHRONOS] CAPITAL ALLOCATION POSTURE*\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"• *Bull Mode Posture*    : `{bull_mode_tag}`\n"
+            f"• *Total Portfolio Equity*: `${m['total_equity']:,.2f}`\n"
+            f"• *Target Deployed Capital*: `${m['target_deployed']:,.2f}` (Bull Mode Active)\n"
+            f"• *Operational Reserve*  : `${m['cash_reserve']:,.2f}`\n"
+            f"• *Available Broker Cash*: `${m['available_cash']:,.2f}`\n"
+            f"• *Active Deployed Gross*: `${m['active_deployed']:,.2f}` ({m['utilization_pct']}% Equity)\n"
+            f"  - Long Positions  : `${m['long_market_value']:,.2f}`\n"
+            f"  - Short Positions : `${abs(m['short_market_value']):,.2f}`\n"
+            f"• *Gross Portfolio Leverage*: `{m['gross_leverage']:.2f}x`\n"
+            f"• *Available Buying Power*: `${m['buying_power']:,.2f}`\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"• *Policy*: 95%-100% Capital Deployment with $1,500 Buffer"
+        )
+        return card
 
 
 if __name__ == "__main__":

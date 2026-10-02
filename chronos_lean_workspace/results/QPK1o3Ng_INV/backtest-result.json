@@ -1,11 +1,15 @@
 {
   "AlphaId": "QPK1o3Ng_INV",
-  "SharpeRatio": 1.046,
-  "SortinoRatio": 0.102,
-  "MaxDrawdown": 0.0735,
-  "AnnualizedReturn": 0.1158,
-  "AverageTurnover": 0.2238,
+  "SharpeRatio": -1.285,
+  "SortinoRatio": -0.114,
+  "MaxDrawdown": 0.1072,
+  "AnnualizedReturn": -0.1117,
+  "AverageTurnover": 0.2346,
+  "RankIC20d": 0.0271,
+  "AlmgrenChrissShortfallBps": 0.68,
+  "TotalImplementationShortfall": 822.55,
+  "ExecutionModel": "Almgren-Chriss (Transient + Permanent Market Impact)",
   "InitialEquity": 100000.0,
-  "FinalEquity": 138659.61,
-  "TradingDays": 752
+  "FinalEquity": 94294.05,
+  "TradingDays": 125
 }

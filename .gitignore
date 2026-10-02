@@ -42,3 +42,14 @@ logs/
 __pycache__/
 .venv/
 chronos_lean_workspace/data/
+
+.env
+*.env
+scratch_*.py
+*.db
+*.sqlite
+*.log
+logs/
+__pycache__/
+.venv/
+chronos_lean_workspace/data/

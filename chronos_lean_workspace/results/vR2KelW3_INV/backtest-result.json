@@ -1,11 +1,15 @@
 {
   "AlphaId": "vR2KelW3_INV",
-  "SharpeRatio": 1.219,
-  "SortinoRatio": 0.115,
-  "MaxDrawdown": 0.0982,
-  "AnnualizedReturn": 0.1245,
-  "AverageTurnover": 0.3431,
+  "SharpeRatio": -1.775,
+  "SortinoRatio": -0.139,
+  "MaxDrawdown": 0.0946,
+  "AnnualizedReturn": -0.1369,
+  "AverageTurnover": 0.3477,
+  "RankIC20d": 0.0141,
+  "AlmgrenChrissShortfallBps": 1.01,
+  "TotalImplementationShortfall": 1178.91,
+  "ExecutionModel": "Almgren-Chriss (Transient + Permanent Market Impact)",
   "InitialEquity": 100000.0,
-  "FinalEquity": 141923.3,
-  "TradingDays": 752
+  "FinalEquity": 92958.72,
+  "TradingDays": 125
 }

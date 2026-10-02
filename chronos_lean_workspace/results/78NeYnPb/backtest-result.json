@@ -1,11 +1,15 @@
 {
   "AlphaId": "78NeYnPb",
-  "SharpeRatio": 1.379,
-  "SortinoRatio": 0.13,
-  "MaxDrawdown": 0.0629,
-  "AnnualizedReturn": 0.1402,
-  "AverageTurnover": 0.241,
+  "SharpeRatio": -1.739,
+  "SortinoRatio": -0.137,
+  "MaxDrawdown": 0.0934,
+  "AnnualizedReturn": -0.1313,
+  "AverageTurnover": 0.26,
+  "RankIC20d": 0.0148,
+  "AlmgrenChrissShortfallBps": 0.75,
+  "TotalImplementationShortfall": 872.36,
+  "ExecutionModel": "Almgren-Chriss (Transient + Permanent Market Impact)",
   "InitialEquity": 100000.0,
-  "FinalEquity": 147938.57,
-  "TradingDays": 752
+  "FinalEquity": 93257.7,
+  "TradingDays": 125
 }

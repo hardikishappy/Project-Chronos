@@ -1,11 +1,15 @@
 {
   "AlphaId": "O0816Lr7",
-  "SharpeRatio": -1.046,
-  "SortinoRatio": -0.091,
-  "MaxDrawdown": 0.3601,
-  "AnnualizedReturn": -0.1147,
-  "AverageTurnover": 0.2238,
+  "SharpeRatio": 0.902,
+  "SortinoRatio": 0.093,
+  "MaxDrawdown": 0.0329,
+  "AnnualizedReturn": 0.0794,
+  "AverageTurnover": 0.2346,
+  "RankIC20d": -0.0271,
+  "AlmgrenChrissShortfallBps": 0.68,
+  "TotalImplementationShortfall": 859.53,
+  "ExecutionModel": "Almgren-Chriss (Transient + Permanent Market Impact)",
   "InitialEquity": 100000.0,
-  "FinalEquity": 69523.69,
-  "TradingDays": 752
+  "FinalEquity": 103862.58,
+  "TradingDays": 125
 }

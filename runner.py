@@ -22,6 +22,7 @@ if sys.stderr is None:
 from data_manager import LeanDataManager
 from transpiler import BrainAlphaTranspiler, FactorEvaluator
 from telegram_notifier import TelegramNotifier
+from execution.almgren_chriss import AlmgrenChrissExecutor
 
 class LeanRunner:
     def __init__(self, workspace_path=None, root_dir=None):
@@ -48,6 +49,7 @@ class LeanRunner:
         self.registry = self._load_registry()
         self._active_portfolio_returns = None
         self.alpha_return_series = {}
+        self.ac_executor = AlmgrenChrissExecutor()
 
     def _load_registry(self) -> dict:
         if os.path.exists(self.registry_path):
@@ -375,6 +377,8 @@ class LeanRunner:
         daily_returns = []
         equity = [100000.0]
         turnover_list = []
+        daily_shortfall_bps_list = []
+        total_shortfall_dollars = 0.0
         prev_w = {}
 
         for dt in dates:
@@ -396,16 +400,57 @@ class LeanRunner:
             else:
                 w = np.zeros_like(demeaned)
 
-            # Turnover
+            # Turnover & Realized Almgren-Chriss Implementation Shortfall Calculation
             curr_w = dict(zip(day['symbol'], w))
             all_syms = set(prev_w.keys()).union(curr_w.keys())
             to = 0.5 * sum(abs(curr_w.get(s, 0.0) - prev_w.get(s, 0.0)) for s in all_syms)
             turnover_list.append(to)
+
+            daily_shortfall_dollars = 0.0
+            curr_eq = equity[-1]
+            day_prices = dict(zip(day['symbol'], day['Close']))
+            day_vols = dict(zip(day['symbol'], day['s20'] / (day['Close'] + 1e-4)))
+            day_advs = dict(zip(day['symbol'], day['Volume'])) if 'Volume' in day.columns else {}
+
+            for s in all_syms:
+                delta_w = abs(curr_w.get(s, 0.0) - prev_w.get(s, 0.0))
+                if delta_w > 1e-5:
+                    p_s = day_prices.get(s, 100.0)
+                    vol_s = day_vols.get(s, 0.015)
+                    adv_s = day_advs.get(s, 5_000_000.0)
+                    trade_shares = int(round((delta_w * curr_eq) / p_s))
+                    if trade_shares > 0:
+                        # Almgren-Chriss trajectory & expected shortfall
+                        if not self.ac_executor.is_large_order(trade_shares, adv_s):
+                            # Standard execution shortfall for liquid panel (<1% ADV): ~1.5 bps
+                            daily_shortfall_dollars += p_s * trade_shares * 0.00015
+                        else:
+                            traj = self.ac_executor.compute_trajectory(
+                                symbol=s,
+                                side="buy",
+                                total_shares=trade_shares,
+                                arrival_price=p_s,
+                                adv=adv_s,
+                                daily_vol_pct=vol_s,
+                                time_horizon_min=60.0,
+                                num_slices=10
+                            )
+                            daily_shortfall_dollars += traj.expected_shortfall_dollars
+
             prev_w = curr_w
 
-            ret = np.sum(w * day['fwd_ret'].values)
-            daily_returns.append(ret)
-            equity.append(equity[-1] * (1.0 + ret))
+            # Shortfall return impact (cost drag)
+            shortfall_ret = daily_shortfall_dollars / max(1.0, curr_eq)
+            shortfall_bps = shortfall_ret * 10000.0
+            daily_shortfall_bps_list.append(shortfall_bps)
+            total_shortfall_dollars += daily_shortfall_dollars
+
+            # Gross return
+            gross_ret = np.sum(w * day['fwd_ret'].values)
+            # Net return after Almgren-Chriss implementation shortfall
+            net_ret = gross_ret - shortfall_ret
+            daily_returns.append(net_ret)
+            equity.append(equity[-1] * (1.0 + net_ret))
 
         r_arr = np.array(daily_returns)
         eq_arr = np.array(equity)
@@ -417,6 +462,22 @@ class LeanRunner:
         max_dd = float(np.max((peaks - eq_arr) / peaks)) if len(eq_arr) > 0 else 0.0
         ann_ret = float(((eq_arr[-1] / eq_arr[0]) ** (252.0 / len(r_arr))) - 1.0) if len(r_arr) > 0 else 0.0
         avg_to = float(np.mean(turnover_list)) if turnover_list else 0.0
+        avg_is_bps = float(np.mean(daily_shortfall_bps_list)) if daily_shortfall_bps_list else 0.0
+
+        # 20-day Forward Rank Information Coefficient
+        rank_ic_20d = 0.0
+        if 'fwd_ret_20d' in df.columns:
+            rank_ics = []
+            for dt in dates[:-20]:
+                day_sub = df[df['date'] == dt].dropna(subset=['alpha_score', 'fwd_ret_20d'])
+                if len(day_sub) >= 10:
+                    r1 = day_sub['alpha_score'].rank().values
+                    r2 = day_sub['fwd_ret_20d'].rank().values
+                    if np.std(r1) > 0 and np.std(r2) > 0:
+                        c = np.corrcoef(r1, r2)[0, 1]
+                        if not np.isnan(c):
+                            rank_ics.append(c)
+            rank_ic_20d = float(np.mean(rank_ics)) if rank_ics else 0.0
 
         metrics = {
             "AlphaId": alpha_id,
@@ -425,6 +486,10 @@ class LeanRunner:
             "MaxDrawdown": round(max_dd, 4),
             "AnnualizedReturn": round(ann_ret, 4),
             "AverageTurnover": round(avg_to, 4),
+            "RankIC20d": round(rank_ic_20d, 4),
+            "AlmgrenChrissShortfallBps": round(avg_is_bps, 2),
+            "TotalImplementationShortfall": round(float(total_shortfall_dollars), 2),
+            "ExecutionModel": "Almgren-Chriss (Transient + Permanent Market Impact)",
             "InitialEquity": 100000.0,
             "FinalEquity": round(float(eq_arr[-1]), 2),
             "TradingDays": len(r_arr)
@@ -709,6 +774,12 @@ class ProjectChronosEnsemble(QCAlgorithm):
         for symbol, weight in zip(symbols_list, target_weights):
             self.SetHoldings(symbol, float(weight))
 '''
+
+    def evaluate_weekly_factor_audit(self, dry_run: bool = False, force: bool = False, lookback_days: int = 126) -> dict:
+        """Invokes the weekly factor audit and adaptive roster swap via ChronosOrchestrator."""
+        from orchestrator import ChronosOrchestrator
+        orchestrator = ChronosOrchestrator(workspace_path=self.workspace_path)
+        return orchestrator.evaluate_weekly_factor_audit(dry_run=dry_run, force=force, lookback_days=lookback_days)
 
 if __name__ == "__main__":
     runner = LeanRunner()

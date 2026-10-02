@@ -14,21 +14,43 @@ import json
 import logging
 import threading
 from datetime import datetime
+from typing import Optional, Dict, Any, List
+import pytz
 
-# Prevent pythonw.exe crash when sys.stdout is None
-if sys.stdout is None:
-    sys.stdout = open(os.devnull, "w")
-if sys.stderr is None:
-    sys.stderr = open(os.devnull, "w")
+# Configure logging directory
+LOG_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs")
+os.makedirs(LOG_DIR, exist_ok=True)
+LOG_FILE = os.path.join(LOG_DIR, "chronos_daemon.log")
+
+# Robust stream redirection for pythonw.exe and UTF-8 console output
+is_pythonw = "pythonw" in sys.executable.lower() or sys.stdout is None
+if is_pythonw:
+    try:
+        sys.stdout = open(os.path.join(LOG_DIR, "daemon_stdout.log"), "a", encoding="utf-8", buffering=1)
+        sys.stderr = open(os.path.join(LOG_DIR, "daemon_stderr.log"), "a", encoding="utf-8", buffering=1)
+        sys.stdin = open(os.devnull, "r", encoding="utf-8")
+    except Exception:
+        pass
+else:
+    try:
+        if hasattr(sys.stdout, "reconfigure"):
+            sys.stdout.reconfigure(encoding="utf-8")
+        if hasattr(sys.stderr, "reconfigure"):
+            sys.stderr.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
+
+from pathlib import Path
+from dotenv import load_dotenv
+
+# Ensure local Chronos .env strictly takes precedence over any inherited environment
+_env_path = Path(__file__).resolve().parent / ".env"
+if _env_path.exists():
+    load_dotenv(dotenv_path=_env_path, override=True)
 
 from runner import LeanRunner
 from telegram_notifier import TelegramNotifier
 from alpaca_broker import AlpacaPaperBroker
-
-# Configure logging
-LOG_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs")
-os.makedirs(LOG_DIR, exist_ok=True)
-LOG_FILE = os.path.join(LOG_DIR, "chronos_daemon.log")
 
 logging.basicConfig(
     filename=LOG_FILE,
@@ -51,6 +73,12 @@ class ChronosDaemon:
         self.notifier = TelegramNotifier(os.path.join(self.root_dir, ".env"))
         self.alpaca = AlpacaPaperBroker(os.path.join(self.root_dir, ".env"))
         
+        # Register Telegram bot command menu
+        try:
+            self.notifier.register_commands_menu()
+        except Exception as e:
+            logging.warning(f"Could not register Telegram commands menu: {e}")
+
         self._last_mtime = 0
         self._last_daily_report_day = None
         self._start_time = datetime.now()
@@ -58,6 +86,167 @@ class ChronosDaemon:
         self._last_scan_time = None
         self._running = True
         self._offset = None
+
+    def get_last_market_rebalance_date(self) -> Optional[str]:
+        """Reads the last market rebalance execution date (YYYY-MM-DD) from backtest_registry.json."""
+        try:
+            if os.path.exists(self.registry_path):
+                with open(self.registry_path, "r", encoding="utf-8") as f:
+                    reg = json.load(f)
+                meta = reg.get("_metadata", {})
+                return meta.get("last_market_rebalance_date")
+        except Exception as e:
+            logging.error(f"Error reading rebalance date from registry: {e}")
+        return None
+
+    def set_last_market_rebalance_date(self, date_str: str, execution_meta: Optional[dict] = None) -> None:
+        """Records the execution date (YYYY-MM-DD) in backtest_registry.json to prevent duplicate runs."""
+        try:
+            reg = {}
+            if os.path.exists(self.registry_path):
+                with open(self.registry_path, "r", encoding="utf-8") as f:
+                    reg = json.load(f)
+            
+            if "_metadata" not in reg or not isinstance(reg["_metadata"], dict):
+                reg["_metadata"] = {}
+            
+            reg["_metadata"]["last_market_rebalance_date"] = date_str
+            reg["_metadata"]["last_rebalance_timestamp"] = datetime.now().isoformat()
+            if execution_meta:
+                reg["_metadata"].update(execution_meta)
+
+            with open(self.registry_path, "w", encoding="utf-8") as f:
+                json.dump(reg, f, indent=2)
+            logging.info(f"Recorded market rebalance execution for {date_str} into {self.registry_path}")
+        except Exception as e:
+            logging.error(f"Error saving rebalance date to registry: {e}")
+
+    def check_market_open_scheduler(self, current_dt_est: Optional[datetime] = None) -> bool:
+        """
+        Automated Daily Market-Open Scheduler:
+        - Every trading day (Monday through Friday) at 09:35 AM US/Eastern (5 minutes after open):
+          - Check Alpaca api.get_clock().is_open.
+          - If market is open, automatically trigger alpaca_broker.execute_rebalance(ensemble_weights).
+          - Dispatch clean execution summary card to Telegram with order IDs, fills, remaining cash.
+          - Prevent duplicate execution: record last execution date (YYYY-MM-DD) in data/backtest_registry.json.
+        """
+        eastern = pytz.timezone("US/Eastern")
+        now_est = current_dt_est or datetime.now(eastern)
+
+        # Check trading days: Monday through Friday (0 to 4)
+        if now_est.weekday() > 4:
+            return False
+
+        today_str = now_est.strftime("%Y-%m-%d")
+        last_run = self.get_last_market_rebalance_date()
+
+        if last_run == today_str:
+            return False # Already executed for today
+
+        # Market-open buffer window: At 09:35 AM EST (or anytime during active market hours after 09:35 AM)
+        is_scheduled_time = (now_est.hour == 9 and now_est.minute >= 35) or (10 <= now_est.hour < 16)
+        if not is_scheduled_time:
+            return False
+
+        # Verify market is open via Alpaca clock
+        if not self.alpaca.is_market_open():
+            # Closed due to market holiday or early close
+            return False
+
+        logging.info(f"[Market Scheduler] 09:35 AM EST window reached on {today_str}. Market is OPEN. Executing automated rebalance...")
+        
+        # Trigger rebalance
+        report = self.alpaca.execute_rebalance()
+
+        # Dispatch clean execution summary card to Telegram
+        card = self.alpaca.format_rebalance_telegram_card(report)
+        self.notifier.send_message(card)
+
+        # Record last execution date to prevent duplicate runs
+        exec_meta = {
+            "status": report.get("status", "success"),
+            "orders_count": report.get("total_orders", 0),
+            "sells_count": report.get("sells_count", 0),
+            "buys_count": report.get("buys_count", 0),
+            "remaining_cash": report.get("remaining_cash", 0.0),
+            "account_equity": report.get("account_equity", 0.0)
+        }
+        self.set_last_market_rebalance_date(today_str, exec_meta)
+        logging.info(f"[Market Scheduler] Daily rebalance successfully routed for {today_str}. Summary card sent.")
+        return True
+
+    def get_last_sunday_audit_date(self) -> Optional[str]:
+        """Reads the last Sunday factor audit execution date (YYYY-MM-DD) from backtest_registry.json."""
+        try:
+            if os.path.exists(self.registry_path):
+                with open(self.registry_path, "r", encoding="utf-8") as f:
+                    reg = json.load(f)
+                meta = reg.get("_metadata", {})
+                return meta.get("last_sunday_audit_date")
+        except Exception as e:
+            logging.error(f"Error reading sunday audit date from registry: {e}")
+        return None
+
+    def set_last_sunday_audit_date(self, date_str: str, audit_meta: Optional[dict] = None) -> None:
+        """Records the Sunday factor audit execution date in backtest_registry.json."""
+        try:
+            reg = {}
+            if os.path.exists(self.registry_path):
+                with open(self.registry_path, "r", encoding="utf-8") as f:
+                    reg = json.load(f)
+
+            if "_metadata" not in reg or not isinstance(reg["_metadata"], dict):
+                reg["_metadata"] = {}
+
+            reg["_metadata"]["last_sunday_audit_date"] = date_str
+            reg["_metadata"]["last_sunday_audit_timestamp"] = datetime.now().isoformat()
+            if audit_meta:
+                reg["_metadata"]["last_audit_demoted"] = audit_meta.get("demoted", [])
+                reg["_metadata"]["last_audit_promoted"] = audit_meta.get("promoted", [])
+                reg["_metadata"]["last_audit_retained_count"] = len(audit_meta.get("retained", []))
+
+            with open(self.registry_path, "w", encoding="utf-8") as f:
+                json.dump(reg, f, indent=2)
+            logging.info(f"Recorded Sunday factor audit execution for {date_str} into {self.registry_path}")
+        except Exception as e:
+            logging.error(f"Error saving sunday audit date to registry: {e}")
+
+    def check_sunday_audit_scheduler(self, current_dt_utc: Optional[datetime] = None) -> bool:
+        """
+        Scheduled Weekend Rolling Re-Audit:
+        - Executes every Sunday at 18:00 UTC (1:00 PM EST / 11:30 PM IST) when markets are closed.
+        - Evaluates all registered alphas over the latest rolling 126-day panel slice.
+        - Performs adaptive roster swaps under mathematical hurdles (Demotion < 0.85 Sharpe, Promotion >= 1.15).
+        - Recomputes risk-parity weights and commits to backtest_registry.json & strategy main.py.
+        - Dispatches structured Sunday Factor Audit Report Card to Telegram.
+        """
+        now_utc = current_dt_utc or datetime.now(pytz.utc)
+
+        # Check for Sunday (weekday == 6 in Python datetime)
+        if now_utc.weekday() != 6:
+            return False
+
+        # Scheduled for 18:00 UTC or later on Sunday
+        if now_utc.hour < 18:
+            return False
+
+        today_str = now_utc.strftime("%Y-%m-%d")
+        last_audit = self.get_last_sunday_audit_date()
+        if last_audit == today_str:
+            return False # Already executed today
+
+        logging.info(f"[Sunday Scheduler] Sunday 18:00 UTC window reached on {today_str}. Initiating factor audit...")
+        try:
+            audit_result = self.runner.evaluate_weekly_factor_audit(dry_run=False)
+            card = audit_result.get("report_card", "")
+            if card:
+                self.notifier.send_message(card)
+            self.set_last_sunday_audit_date(today_str, audit_result)
+            logging.info(f"[Sunday Scheduler] Weekly factor audit successfully completed and card dispatched for {today_str}.")
+            return True
+        except Exception as e:
+            logging.error(f"[Sunday Scheduler] Error executing weekly factor audit: {e}", exc_info=True)
+            return False
 
     def check_and_process(self, force_all: bool = False):
         """Scans alpha_db.json, extracts accepted alphas, and processes unbacktested entries."""
@@ -164,7 +353,7 @@ class ChronosDaemon:
             registry = self.runner._load_registry()
             qualifying = [
                 a for a, rec in registry.items()
-                if rec.get("metrics", {}).get("EnsembleVerdict") == "[ACCEPTED FOR LIVE ROUTING]"
+                if a != "_metadata" and isinstance(rec, dict) and rec.get("metrics", {}).get("EnsembleVerdict") == "[ACCEPTED FOR LIVE ROUTING]"
             ]
             
             self.notifier.send_heartbeat(uptime_str, len(qualifying), os.getpid())
@@ -186,22 +375,30 @@ class ChronosDaemon:
         registry = self.runner._load_registry()
         qualifying = [
             a for a, rec in registry.items()
-            if rec.get("metrics", {}).get("EnsembleVerdict") == "[ACCEPTED FOR LIVE ROUTING]"
+            if a != "_metadata" and isinstance(rec, dict) and rec.get("metrics", {}).get("EnsembleVerdict") == "[ACCEPTED FOR LIVE ROUTING]"
         ]
 
         if cmd in ["/status", "status"]:
+            clock = self.alpaca.get_clock()
+            is_open = clock.get("is_open", False)
+            market_st = "OPEN" if is_open else "CLOSED"
+            last_rebal = self.get_last_market_rebalance_date() or "Pending First Scheduled Run"
+            eval_count = len([a for a in registry if a != "_metadata"])
+
             msg = (
                 f"⚡ [PROJECT CHRONOS] SYSTEM STATUS & HEALTH\n"
                 f"═════════════════════════════════════════════\n"
                 f"Daemon Status    : ONLINE (24/7 Auto-Pilot)\n"
                 f"Process PID      : {os.getpid()}\n"
                 f"Uptime           : {uptime_str}\n"
+                f"US Market Clock  : {market_st} (US/Eastern)\n"
+                f"Auto Scheduler   : Active (Daily at 09:35 AM EST)\n"
+                f"Last Execution   : {last_rebal}\n"
                 f"DB Watcher       : ACTIVE (Polling every 15s)\n"
-                f"Source Alpha DB  : C:\\Users\\hardi\\wq-alpha-research\\alpha_db.json\n"
-                f"Registry Alphas  : {len(registry)} Evaluated\n"
+                f"Registry Alphas  : {eval_count} Evaluated\n"
                 f"Live Ensemble    : {len(qualifying)} Qualifying Alphas Active\n"
                 f"Listener Mode    : Long-Polling HTTP Thread (Active)\n"
-                f"Heartbeat Cadence: 6-Hour Automated Keep-Alive\n"
+                f"Heartbeat Cadence: 6-Hour Silent Keep-Alive\n"
                 f"Last DB Scan     : {self._last_scan_time.strftime('%Y-%m-%d %H:%M:%S') if self._last_scan_time else 'Active'}\n"
                 f"═════════════════════════════════════════════"
             )
@@ -279,38 +476,27 @@ class ChronosDaemon:
             self.notifier.send_message(msg, target_chat_id=chat_id)
 
         elif cmd in ["/trade", "trade", "/sync_alpaca", "/rebalance_alpaca"]:
-            self.notifier.send_message("⚙️ [CHRONOS ALPACA] Calculating multi-factor risk-parity target weights and generating paper orders...", target_chat_id=chat_id)
-            
-            # Default target weights for top liquid mega-caps from active ensemble
-            target_weights = {
-                "AAPL": 0.065, "MSFT": 0.060, "NVDA": 0.075, "GOOGL": 0.055, "AMZN": 0.050,
-                "META": 0.055, "TSLA": 0.040, "JPM": 0.050, "UNH": 0.050, "XOM": -0.045,
-                "JNJ": 0.040, "V": 0.045, "PG": 0.040, "MA": 0.045, "HD": 0.035,
-                "BAC": -0.040, "INTC": -0.055, "CSCO": -0.045, "KO": -0.035, "DIS": -0.030
-            }
-            # Rebalance
-            report = self.alpaca.rebalance_portfolio(target_weights=target_weights)
-            
-            placed_orders = report.get("execution_results", [])
-            sells_count = report.get("sells_count", 0)
-            buys_count = report.get("buys_count", 0)
-            
-            trade_card = (
-                f"✅ [CHRONOS ALPACA] PORTFOLIO REBALANCE EXECUTED\n"
-                f"═════════════════════════════════════════════\n"
-                f"• Execution Mode : `{'LIVE PAPER REST' if self.alpaca.is_configured else 'SIMULATED SANDBOX'}`\n"
-                f"• Account Equity : `${report.get('account_equity', 0.0):,.2f}`\n"
-                f"• Orders Placed  : `{len(placed_orders)} Total` ({sells_count} Sells, {buys_count} Buys)\n"
-                f"• Target Assets  : `{len(target_weights)} Mega-Cap Stocks`\n"
-                f"• Status         : `SUCCESSFULLY ROUTED`\n"
-                f"═════════════════════════════════════════════\n"
-                f"Send `/positions` to view updated portfolio holdings."
-            )
-            self.notifier.send_message(trade_card, target_chat_id=chat_id)
+            bypass = "force" in text.lower()
+
+            # Market Closed Protection: Check if US equity markets are currently open
+            if not bypass and self.alpaca.is_configured and not self.alpaca.is_market_open():
+                closed_msg = (
+                    "⚠️ Market is currently CLOSED. Scheduled to fire automatically at 09:35 AM EST.\n\n"
+                    "• Trading Schedule: Monday through Friday (09:35 AM - 04:00 PM EST)\n"
+                    "• Send `/trade force` to bypass market hours validation."
+                )
+                self.notifier.send_message(closed_msg, target_chat_id=chat_id)
+            else:
+                self.notifier.send_message("⚙️ [CHRONOS ALPACA] Calculating multi-factor risk-parity target weights and executing rebalance...", target_chat_id=chat_id)
+                report = self.alpaca.execute_rebalance(bypass_market_hours=bypass)
+                trade_card = self.alpaca.format_rebalance_telegram_card(report)
+                self.notifier.send_message(trade_card, target_chat_id=chat_id)
 
         elif cmd in ["/alphas", "alphas"]:
             lines = []
             for aid in qualifying:
+                if aid == "_metadata":
+                    continue
                 rec = registry.get(aid, {})
                 m = rec.get("metrics", {})
                 sh = m.get("SharpeRatio", 0.0)
@@ -341,10 +527,34 @@ class ChronosDaemon:
             )
             self.notifier.send_message(msg, target_chat_id=chat_id)
 
+        elif cmd in ["/regime", "regime"]:
+            self.notifier.send_message("🧠 [PROJECT CHRONOS] Querying 3-state continuous Gaussian HMM regime & dynamic alpha tilts...", target_chat_id=chat_id)
+            try:
+                panel = self.alpaca.load_market_panel()
+                regime_info = self.alpaca.regime_hmm.get_latest_regime(panel)
+                self.notifier.send_regime_card(regime_info, target_chat_id=chat_id)
+            except Exception as e:
+                logging.error(f"Error computing HMM regime for Telegram: {e}")
+                self.notifier.send_message(f"⚠️ Error computing HMM regime: {e}", target_chat_id=chat_id)
+
         elif cmd in ["/rebalance", "rebalance", "/cycle", "cycle"]:
             self.notifier.send_message("🔄 [PROJECT CHRONOS] Initiating manual Project Alpha DB scan & cycle check...", target_chat_id=chat_id)
             self.check_and_process(force_all=False)
             self.notifier.send_message("✅ [PROJECT CHRONOS] DB check complete. All approved alphas evaluated.", target_chat_id=chat_id)
+
+        elif cmd in ["/capital", "capital"]:
+            msg = self.alpaca.format_capital_telegram_card()
+            self.notifier.send_message(msg, target_chat_id=chat_id)
+
+        elif cmd in ["/audit", "audit"]:
+            self.notifier.send_message("🔬 [PROJECT CHRONOS] Executing on-demand weekly factor audit & adaptive roster swap inspection...", target_chat_id=chat_id)
+            try:
+                audit_res = self.runner.evaluate_weekly_factor_audit(dry_run=False)
+                card = audit_res.get("report_card", "Factor audit completed.")
+                self.notifier.send_message(card, target_chat_id=chat_id)
+            except Exception as e:
+                logging.error(f"Error running on-demand factor audit: {e}", exc_info=True)
+                self.notifier.send_message(f"⚠️ Error executing factor audit: {e}", target_chat_id=chat_id)
 
         else: # /help or unknown
             msg = (
@@ -352,10 +562,13 @@ class ChronosDaemon:
                 f"═════════════════════════════════════════════\n"
                 f"Available Commands:\n"
                 f"• /status     - System health, daemon uptime, PID & DB watcher state\n"
+                f"• /capital    - Live capital deployment, operational reserve & gross leverage\n"
+                f"• /audit      - Run weekly factor re-audit & adaptive roster swap check\n"
                 f"• /portfolio  - Multi-alpha master ensemble performance & active roster\n"
                 f"• /positions  - Current Alpaca paper holdings and asset weights\n"
                 f"• /alpaca     - Alpaca Paper Trading account status, cash & buying power\n"
-                f"• /trade      - Rebalance Alpaca Paper portfolio to Chronos multi-factor weights\n"
+                f"• /regime     - 3-State Gaussian HMM market regime state & factor tilts\n"
+                f"• /trade      - Rebalance Alpaca Paper portfolio with Almgren-Chriss execution\n"
                 f"• /alphas     - Breakdown of all qualifying quantitative alphas\n"
                 f"• /heartbeat  - Manual ping test & daemon responsiveness verification\n"
                 f"• /rebalance  - Trigger instant Project Alpha scan & cycle check\n"
@@ -383,33 +596,46 @@ class ChronosDaemon:
 
     def start_polling(self, poll_interval_sec: int = 15):
         """Starts 24/7 background polling with concurrent Telegram command listener."""
-        logging.info("Project Chronos Daemon starting 24/7 background polling...")
-        
-        # 1. Start concurrent Telegram listener thread
-        listener_thread = threading.Thread(target=self._telegram_listener_worker, daemon=True)
-        listener_thread.start()
+        try:
+            logging.info("Project Chronos Daemon starting 24/7 background polling...")
+            
+            # 1. Start concurrent Telegram listener thread
+            listener_thread = threading.Thread(target=self._telegram_listener_worker, daemon=True)
+            listener_thread.start()
 
-        # 2. Initial complete cycle & daily summary
-        self.check_and_process(force_all=False)
-        self.run_daily_summary()
+            # 2. Initial complete cycle & daily summary
+            self.check_and_process(force_all=False)
+            self.run_daily_summary()
 
-        # 3. Initial boot heartbeat notification
-        uptime_delta = datetime.now() - self._start_time
-        uptime_str = "0h 0m 1s"
-        reg = self.runner._load_registry()
-        qual = [a for a, rec in reg.items() if rec.get("metrics", {}).get("EnsembleVerdict") == "[ACCEPTED FOR LIVE ROUTING]"]
-        self.notifier.send_heartbeat(uptime_str, len(qual), os.getpid())
-
-        # 4. Continuous database watcher loop
-        while self._running:
+            # 3. Initial boot heartbeat notification
+            uptime_delta = datetime.now() - self._start_time
+            uptime_str = "0h 0m 1s"
+            reg = self.runner._load_registry()
+            qual = [a for a, rec in reg.items() if a != "_metadata" and isinstance(rec, dict) and rec.get("metrics", {}).get("EnsembleVerdict") == "[ACCEPTED FOR LIVE ROUTING]"]
             try:
-                self.check_and_process(force_all=False)
-                self.run_daily_summary()
-                self.check_heartbeat()
+                self.notifier.send_heartbeat(uptime_str, len(qual), os.getpid())
             except Exception as e:
-                logging.error(f"Unexpected error in daemon loop: {e}")
-            time.sleep(poll_interval_sec)
+                logging.warning(f"Could not send boot heartbeat: {e}")
+
+            logging.info(f"ChronosDaemon background loop entering steady-state polling. PID={os.getpid()}")
+
+            # 4. Continuous database watcher and automated market open scheduler loop
+            while self._running:
+                try:
+                    self.check_and_process(force_all=False)
+                    self.run_daily_summary()
+                    self.check_heartbeat()
+                    self.check_market_open_scheduler()
+                    self.check_sunday_audit_scheduler()
+                except Exception as e:
+                    logging.error(f"Unexpected error in daemon loop: {e}", exc_info=True)
+                time.sleep(poll_interval_sec)
+        except Exception as e:
+            logging.critical(f"Fatal unhandled exception in start_polling: {e}", exc_info=True)
 
 if __name__ == "__main__":
-    daemon = ChronosDaemon()
-    daemon.start_polling(poll_interval_sec=15)
+    try:
+        daemon = ChronosDaemon()
+        daemon.start_polling(poll_interval_sec=15)
+    except Exception as e:
+        logging.critical(f"Fatal unhandled exception in daemon main: {e}", exc_info=True)

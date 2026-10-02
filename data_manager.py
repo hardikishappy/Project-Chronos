@@ -18,21 +18,82 @@ except Exception:
 from datetime import datetime
 
 DEFAULT_UNIVERSE = [
-    "AAPL", "MSFT", "GOOGL", "AMZN", "NVDA", "META", "TSLA", "JPM", "UNH", "XOM",
-    "JNJ", "V", "PG", "MA", "HD", "BAC", "ABBV", "KO", "PEP", "MRK",
-    "CVX", "COST", "AVGO", "CSCO", "WMT", "MCD", "DIS", "AMD", "NFLX", "INTC"
+    # Information Technology (24)
+    "AAPL", "MSFT", "NVDA", "AVGO", "CSCO", "AMD", "INTC", "CRM", "ORCL", "ADBE",
+    "QCOM", "TXN", "AMAT", "IBM", "NOW", "INTU", "MU", "LRCX", "ADI", "PANW",
+    "KLAC", "SNPS", "CDNS", "CRWD",
+    # Communication Services (9)
+    "GOOGL", "META", "DIS", "NFLX", "CMCSA", "VZ", "T", "CHTR", "TMUS",
+    # Consumer Discretionary (12)
+    "AMZN", "TSLA", "HD", "MCD", "NKE", "SBUX", "LOW", "BKNG", "TJX", "TGT", "F", "GM",
+    # Consumer Staples (11)
+    "PG", "KO", "PEP", "COST", "WMT", "PM", "MO", "MDLZ", "CL", "KMB", "STZ",
+    # Financials (15)
+    "JPM", "V", "MA", "BAC", "WFC", "MS", "GS", "BLK", "C", "AXP",
+    "SCHW", "CB", "MMC", "PGR", "USB",
+    # Healthcare (17)
+    "UNH", "JNJ", "ABBV", "MRK", "LLY", "PFE", "TMO", "ABT", "DHR", "BMY",
+    "AMGN", "CVS", "GILD", "ISRG", "CI", "REGN", "VRTX",
+    # Energy (9)
+    "XOM", "CVX", "COP", "SLB", "EOG", "MPC", "PSX", "VLO", "OXY",
+    # Industrials (10)
+    "CAT", "GE", "UNP", "HON", "RTX", "BA", "DE", "LMT", "UPS", "ADP",
+    # Materials (5)
+    "LIN", "APD", "SHW", "FCX", "NEM",
+    # Utilities (4)
+    "NEE", "SO", "DUK", "SRE",
+    # Real Estate (4)
+    "PLD", "AMT", "EQIX", "CCI"
 ]
 
 SECTOR_MAP = {
-    "AAPL": "Information Technology", "MSFT": "Information Technology", "GOOGL": "Communication Services",
-    "AMZN": "Consumer Discretionary", "NVDA": "Information Technology", "META": "Communication Services",
-    "TSLA": "Consumer Discretionary", "JPM": "Financials", "UNH": "Healthcare", "XOM": "Energy",
-    "JNJ": "Healthcare", "V": "Financials", "PG": "Consumer Staples", "MA": "Financials",
-    "HD": "Consumer Discretionary", "BAC": "Financials", "ABBV": "Healthcare", "KO": "Consumer Staples",
-    "PEP": "Consumer Staples", "MRK": "Healthcare", "CVX": "Energy", "COST": "Consumer Staples",
-    "AVGO": "Information Technology", "CSCO": "Information Technology", "WMT": "Consumer Staples",
-    "MCD": "Consumer Discretionary", "DIS": "Communication Services", "AMD": "Information Technology",
-    "NFLX": "Communication Services", "INTC": "Information Technology"
+    # Information Technology
+    "AAPL": "Information Technology", "MSFT": "Information Technology", "NVDA": "Information Technology",
+    "AVGO": "Information Technology", "CSCO": "Information Technology", "AMD": "Information Technology",
+    "INTC": "Information Technology", "CRM": "Information Technology", "ORCL": "Information Technology",
+    "ADBE": "Information Technology", "QCOM": "Information Technology", "TXN": "Information Technology",
+    "AMAT": "Information Technology", "IBM": "Information Technology", "NOW": "Information Technology",
+    "INTU": "Information Technology", "MU": "Information Technology", "LRCX": "Information Technology",
+    "ADI": "Information Technology", "PANW": "Information Technology", "KLAC": "Information Technology",
+    "SNPS": "Information Technology", "CDNS": "Information Technology", "CRWD": "Information Technology",
+    # Communication Services
+    "GOOGL": "Communication Services", "META": "Communication Services", "DIS": "Communication Services",
+    "NFLX": "Communication Services", "CMCSA": "Communication Services", "VZ": "Communication Services",
+    "T": "Communication Services", "CHTR": "Communication Services", "TMUS": "Communication Services",
+    # Consumer Discretionary
+    "AMZN": "Consumer Discretionary", "TSLA": "Consumer Discretionary", "HD": "Consumer Discretionary",
+    "MCD": "Consumer Discretionary", "NKE": "Consumer Discretionary", "SBUX": "Consumer Discretionary",
+    "LOW": "Consumer Discretionary", "BKNG": "Consumer Discretionary", "TJX": "Consumer Discretionary",
+    "TGT": "Consumer Discretionary", "F": "Consumer Discretionary", "GM": "Consumer Discretionary",
+    # Consumer Staples
+    "PG": "Consumer Staples", "KO": "Consumer Staples", "PEP": "Consumer Staples",
+    "COST": "Consumer Staples", "WMT": "Consumer Staples", "PM": "Consumer Staples",
+    "MO": "Consumer Staples", "MDLZ": "Consumer Staples", "CL": "Consumer Staples",
+    "KMB": "Consumer Staples", "STZ": "Consumer Staples",
+    # Financials
+    "JPM": "Financials", "V": "Financials", "MA": "Financials", "BAC": "Financials",
+    "WFC": "Financials", "MS": "Financials", "GS": "Financials", "BLK": "Financials",
+    "C": "Financials", "AXP": "Financials", "SCHW": "Financials", "CB": "Financials",
+    "MMC": "Financials", "PGR": "Financials", "USB": "Financials",
+    # Healthcare
+    "UNH": "Healthcare", "JNJ": "Healthcare", "ABBV": "Healthcare", "MRK": "Healthcare",
+    "LLY": "Healthcare", "PFE": "Healthcare", "TMO": "Healthcare", "ABT": "Healthcare",
+    "DHR": "Healthcare", "BMY": "Healthcare", "AMGN": "Healthcare", "CVS": "Healthcare",
+    "GILD": "Healthcare", "ISRG": "Healthcare", "CI": "Healthcare", "REGN": "Healthcare",
+    "VRTX": "Healthcare",
+    # Energy
+    "XOM": "Energy", "CVX": "Energy", "COP": "Energy", "SLB": "Energy",
+    "EOG": "Energy", "MPC": "Energy", "PSX": "Energy", "VLO": "Energy", "OXY": "Energy",
+    # Industrials
+    "CAT": "Industrials", "GE": "Industrials", "UNP": "Industrials", "HON": "Industrials",
+    "RTX": "Industrials", "BA": "Industrials", "DE": "Industrials", "LMT": "Industrials",
+    "UPS": "Industrials", "ADP": "Industrials",
+    # Materials
+    "LIN": "Materials", "APD": "Materials", "SHW": "Materials", "FCX": "Materials", "NEM": "Materials",
+    # Utilities
+    "NEE": "Utilities", "SO": "Utilities", "DUK": "Utilities", "SRE": "Utilities",
+    # Real Estate
+    "PLD": "Real Estate", "AMT": "Real Estate", "EQIX": "Real Estate", "CCI": "Real Estate"
 }
 
 class LeanDataManager:
@@ -50,24 +111,57 @@ class LeanDataManager:
         for d in [self.daily_dir, self.map_files_dir, self.factor_files_dir]:
             os.makedirs(d, exist_ok=True)
 
-    def fetch_and_ingest(self, symbols=None, start_date="2020-01-01", end_date="2024-01-01"):
+    def fetch_and_ingest(self, symbols=None, start_date="2021-01-01", end_date="2024-01-01"):
         if symbols is None:
             symbols = DEFAULT_UNIVERSE
             
         print(f"[Chronos DataManager] Ingesting {len(symbols)} symbols from {start_date} to {end_date}...")
         results = {}
         
+        # 1. Batch download with yf.download for high throughput
+        batch_df = None
+        try:
+            print(f"  -> Batch downloading {len(symbols)} tickers via multithreaded yfinance...")
+            batch_df = yf.download(
+                symbols,
+                start=start_date,
+                end=end_date,
+                auto_adjust=True,
+                progress=False,
+                threads=True
+            )
+        except Exception as e:
+            print(f"  [!] Batch download failed ({e}), falling back to iterative retrieval...")
+
+        # 2. Process each symbol
         for sym in symbols:
+            df = None
             try:
-                print(f"  -> Downloading {sym}...")
-                ticker = yf.Ticker(sym)
-                df = ticker.history(start=start_date, end=end_date, auto_adjust=True)
-                
-                if df.empty or len(df) < 50:
-                    print(f"  [!] Warning: Insufficient data for {sym} (rows: {len(df)})")
+                if batch_df is not None and not batch_df.empty:
+                    if isinstance(batch_df.columns, pd.MultiIndex):
+                        cols = batch_df.columns
+                        # Level 0 is metric, Level 1 is ticker OR vice versa
+                        if sym in cols.levels[1]:
+                            sub_dict = {}
+                            for col_name in ['Open', 'High', 'Low', 'Close', 'Volume']:
+                                if (col_name, sym) in cols:
+                                    sub_dict[col_name] = batch_df[(col_name, sym)]
+                            if sub_dict:
+                                df = pd.DataFrame(sub_dict).dropna()
+                        elif sym in cols.levels[0]:
+                            df = batch_df[sym][['Open', 'High', 'Low', 'Close', 'Volume']].dropna()
+
+                if df is None or df.empty or len(df) < 50:
+                    # Fallback to single-ticker history
+                    ticker = yf.Ticker(sym)
+                    df = ticker.history(start=start_date, end=end_date, auto_adjust=True)
+                    if not df.empty:
+                        df = df[['Open', 'High', 'Low', 'Close', 'Volume']].dropna()
+
+                if df is None or df.empty or len(df) < 50:
+                    print(f"  [!] Warning: Insufficient data for {sym} (rows: {len(df) if df is not None else 0})")
                     continue
-                    
-                df = df[['Open', 'High', 'Low', 'Close', 'Volume']].dropna()
+
                 self._save_lean_equity_bar(sym, df)
                 self._create_lean_auxiliary_files(sym, df)
                 results[sym] = df
@@ -138,9 +232,22 @@ class LeanDataManager:
         panel.reset_index(names='date', inplace=True)
         # Ensure date is tz-naive datetime
         panel['date'] = pd.to_datetime(panel['date']).dt.tz_localize(None)
+        
+        # 1. Primary workspace location
         cache_file = os.path.join(self.workspace_path, "data", "consolidated_panel.csv")
+        os.makedirs(os.path.dirname(cache_file), exist_ok=True)
         panel.to_csv(cache_file, index=False)
         print(f"  [OK] Consolidated universe panel saved to: {cache_file}")
+
+        # 2. Synchronize to root data/ directories for fast access by all modules
+        root_dir = os.path.dirname(os.path.abspath(self.workspace_path))
+        data_dir = os.path.join(root_dir, "data")
+        os.makedirs(data_dir, exist_ok=True)
+        root_cache = os.path.join(data_dir, "consolidated_panel.csv")
+        universe_cache = os.path.join(data_dir, "universe_panel.csv")
+        panel.to_csv(root_cache, index=False)
+        panel.to_csv(universe_cache, index=False)
+        print(f"  [OK] Root cache mirrors updated: {root_cache}, {universe_cache}")
 
     def load_universe_panel(self):
         cache_file = os.path.join(self.workspace_path, "data", "consolidated_panel.csv")

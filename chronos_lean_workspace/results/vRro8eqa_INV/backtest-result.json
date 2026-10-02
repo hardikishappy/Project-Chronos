@@ -1,11 +1,15 @@
 {
   "AlphaId": "vRro8eqa_INV",
-  "SharpeRatio": 1.242,
-  "SortinoRatio": 0.114,
-  "MaxDrawdown": 0.0895,
-  "AnnualizedReturn": 0.1272,
-  "AverageTurnover": 0.3346,
+  "SharpeRatio": -1.902,
+  "SortinoRatio": -0.149,
+  "MaxDrawdown": 0.0999,
+  "AnnualizedReturn": -0.1436,
+  "AverageTurnover": 0.3405,
+  "RankIC20d": 0.0193,
+  "AlmgrenChrissShortfallBps": 0.99,
+  "TotalImplementationShortfall": 1147.98,
+  "ExecutionModel": "Almgren-Chriss (Transient + Permanent Market Impact)",
   "InitialEquity": 100000.0,
-  "FinalEquity": 142954.56,
-  "TradingDays": 752
+  "FinalEquity": 92597.0,
+  "TradingDays": 125
 }

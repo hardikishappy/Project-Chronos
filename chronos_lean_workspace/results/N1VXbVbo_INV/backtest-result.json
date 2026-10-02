@@ -1,11 +1,15 @@
 {
   "AlphaId": "N1VXbVbo_INV",
-  "SharpeRatio": 1.565,
-  "SortinoRatio": 0.151,
-  "MaxDrawdown": 0.1754,
-  "AnnualizedReturn": 0.233,
-  "AverageTurnover": 0.1625,
+  "SharpeRatio": -0.65,
+  "SortinoRatio": -0.059,
+  "MaxDrawdown": 0.0614,
+  "AnnualizedReturn": -0.0712,
+  "AverageTurnover": 0.1529,
+  "RankIC20d": 0.0197,
+  "AlmgrenChrissShortfallBps": 0.43,
+  "TotalImplementationShortfall": 537.06,
+  "ExecutionModel": "Almgren-Chriss (Transient + Permanent Market Impact)",
   "InitialEquity": 100000.0,
-  "FinalEquity": 186807.21,
-  "TradingDays": 752
+  "FinalEquity": 96402.23,
+  "TradingDays": 125
 }

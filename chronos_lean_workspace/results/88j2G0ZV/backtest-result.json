@@ -1,11 +1,15 @@
 {
   "AlphaId": "88j2G0ZV",
-  "SharpeRatio": -1.265,
-  "SortinoRatio": -0.112,
-  "MaxDrawdown": 0.362,
-  "AnnualizedReturn": -0.1289,
-  "AverageTurnover": 0.4731,
+  "SharpeRatio": -1.054,
+  "SortinoRatio": -0.117,
+  "MaxDrawdown": 0.0605,
+  "AnnualizedReturn": -0.0818,
+  "AverageTurnover": 0.4863,
+  "RankIC20d": -0.006,
+  "AlmgrenChrissShortfallBps": 1.44,
+  "TotalImplementationShortfall": 1734.35,
+  "ExecutionModel": "Almgren-Chriss (Transient + Permanent Market Impact)",
   "InitialEquity": 100000.0,
-  "FinalEquity": 66243.05,
-  "TradingDays": 752
+  "FinalEquity": 95853.46,
+  "TradingDays": 125
 }

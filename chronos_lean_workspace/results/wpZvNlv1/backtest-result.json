@@ -1,11 +1,15 @@
 {
   "AlphaId": "wpZvNlv1",
-  "SharpeRatio": -1.042,
-  "SortinoRatio": -0.079,
-  "MaxDrawdown": 0.3462,
-  "AnnualizedReturn": -0.1056,
-  "AverageTurnover": 0.5514,
+  "SharpeRatio": 1.744,
+  "SortinoRatio": 0.173,
+  "MaxDrawdown": 0.026,
+  "AnnualizedReturn": 0.1151,
+  "AverageTurnover": 0.5579,
+  "RankIC20d": -0.0003,
+  "AlmgrenChrissShortfallBps": 1.65,
+  "TotalImplementationShortfall": 1945.17,
+  "ExecutionModel": "Almgren-Chriss (Transient + Permanent Market Impact)",
   "InitialEquity": 100000.0,
-  "FinalEquity": 71674.89,
-  "TradingDays": 752
+  "FinalEquity": 105553.06,
+  "TradingDays": 125
 }
